@@ -3,7 +3,6 @@ package main
 import (
 	"botTtrader/Users"
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"github.com/joho/godotenv"
@@ -13,7 +12,7 @@ import (
 	"os"
 )
 
-func createBotAndPoll() (*telego.Bot, *th.BotHandler, *Users.User, error) {
+func createBotAndPoll() (*telego.Bot, *th.BotHandler, error) {
 	err := godotenv.Load("settings.env")
 	if err != nil {
 		log.Fatal("Error loading .env file")
@@ -21,24 +20,24 @@ func createBotAndPoll() (*telego.Bot, *th.BotHandler, *Users.User, error) {
 	bot, err := telego.NewBot(os.Getenv("BOT_TOKEN"), telego.WithDefaultDebugLogger())
 	if err != nil {
 		log.Fatal(err)
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	upd, err := bot.UpdatesViaLongPolling(context.Background(), nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 	bh, _ := th.NewBotHandler(bot, upd)
-	return bot, bh, &owner, nil
+	return bot, bh, nil
 }
 
-func getInfoAboutOwner(db *sql.DB) {
-	owner, err := Users.GetOwner(db)
-	if err == nil {
-		//
-	} else {
-		//
-	}
-}
+//func getInfoAboutOwner(db *sql.DB) {
+//	owner, err := Users.GetOwner(db)
+//	if err == nil {
+//		//
+//	} else {
+//		//
+//	}
+//}
 
 func addOwnerInfo(bh *th.BotHandler) {
 	bh.Handle(func(ctx *th.Context, update telego.Update) error {

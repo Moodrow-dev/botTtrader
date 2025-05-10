@@ -3,7 +3,6 @@ package Items
 import (
 	"database/sql"
 	"fmt"
-	_ "gi
 	"log"
 	"time"
 )

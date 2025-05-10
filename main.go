@@ -1,11 +1,26 @@
 package main
 
-import "log"
+import (
+	"botTtrader/Customer"
+	"botTtrader/Items"
+	"database/sql"
+	"log"
+	"time"
+)
 
 func main() {
-	_, bh, _, _ := createBotAndPoll()
+	db, err := sql.Open("sqlite3", "./store.db")
+	defer db.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	addOwnerInfo(bh)
+	Items.InitDB(db)
+	Items.Save(Items.Item{1, "Pin", "Товар 1", "Первый пробный товар", 100, time.Now()}, db)
+	_, bh, _ := createBotAndPoll()
+
+	Customer.Menu(bh)
+	Customer.Price(bh, db)
 
 	go func() {
 		err1 := bh.Start()
