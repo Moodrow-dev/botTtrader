@@ -16,11 +16,12 @@ func main() {
 	}
 
 	Items.InitDB(db)
-	Items.Save(Items.Item{1, "Pin", "Товар 1", "Первый пробный товар", 100, time.Now()}, db)
+	Items.Save(Items.Item{1, "Pin", "Товар 1", "Первый пробный товар", 100, "123", time.Now()}, db)
 	_, bh, _ := createBotAndPoll()
 
 	Customer.Menu(bh)
 	Customer.Price(bh, db)
+	Customer.GetInfoAboutItem(bh, db)
 
 	go func() {
 		err1 := bh.Start()

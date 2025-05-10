@@ -7,6 +7,8 @@ import (
 	"github.com/mymmrac/telego"
 	th "github.com/mymmrac/telego/telegohandler"
 	tu "github.com/mymmrac/telego/telegoutil"
+	"strconv"
+	"strings"
 )
 
 func Menu(bh *th.BotHandler) {
@@ -20,9 +22,21 @@ func Menu(bh *th.BotHandler) {
 
 	bh.Handle(func(ctx *th.Context, update telego.Update) error {
 		bot := ctx.Bot()
-		chatID := telego.ChatID{ID: update.CallbackQuery.From.ID}
-		println(chatID.ID)
-		bot.SendMessage(ctx, &telego.SendMessageParams{ChatID: chatID, ReplyMarkup: kb, Text: fmt.Sprintf("Привет, %v", update.Message.From.FirstName)})
+		callback := update.CallbackQuery
+
+		chatID := telego.ChatID{ID: callback.Message.GetChat().ID}
+
+		_, err := bot.EditMessageText(ctx, &telego.EditMessageTextParams{
+			ChatID:      chatID,
+			MessageID:   callback.Message.GetMessageID(),
+			Text:        fmt.Sprintf("Привет, %s", callback.From.FirstName),
+			ReplyMarkup: kb,
+		})
+
+		if err != nil {
+			return err
+		}
+
 		return nil
 	}, th.CallbackDataEqual("customerMenu"))
 }
@@ -30,7 +44,9 @@ func Menu(bh *th.BotHandler) {
 func Price(bh *th.BotHandler, db *sql.DB) {
 	bh.Handle(func(ctx *th.Context, update telego.Update) error {
 		bot := ctx.Bot()
-		chatID := telego.ChatID{ID: update.CallbackQuery.From.ID}
+		callback := update.CallbackQuery
+		chatID := telego.ChatID{ID: callback.Message.GetChat().ID}
+		messageID := callback.Message.GetMessageID()
 		items, err := Items.GetAll(db)
 		if err != nil {
 			bot.SendMessage(ctx, &telego.SendMessageParams{ChatID: chatID, Text: "Произошла ошибка, обратитесь к владельцу"})
@@ -43,9 +59,9 @@ func Price(bh *th.BotHandler, db *sql.DB) {
 			}
 			btns = append(btns, telego.InlineKeyboardButton{Text: "Назад", CallbackData: "customerMenu"})
 			kb := tu.InlineKeyboard(btns)
-			bot.SendMessage(ctx, &telego.SendMessageParams{ReplyMarkup: kb, Text: "Вот текущий ассортимент:", ChatID: chatID})
+			bot.EditMessageText(ctx, &telego.EditMessageTextParams{MessageID: messageID, ReplyMarkup: kb, Text: "Вот текущий ассортимент:", ChatID: chatID})
 		} else {
-			bot.SendMessage(ctx, &telego.SendMessageParams{ReplyMarkup: nil, ChatID: chatID, Text: "Пока в продаже ничего нет :("})
+			bot.EditMessageText(ctx, &telego.EditMessageTextParams{MessageID: messageID, ChatID: chatID, Text: "Пока в продаже ничего нет :("})
 		}
 		return nil
 	}, th.CallbackDataEqual("price"))
@@ -54,8 +70,18 @@ func Price(bh *th.BotHandler, db *sql.DB) {
 func GetInfoAboutItem(bh *th.BotHandler, db *sql.DB) {
 	bh.Handle(func(ctx *th.Context, update telego.Update) error {
 		bot := ctx.Bot()
-		chatID := update.Message.Chat.ChatID()
-		bot.SendMessage(ctx, &telego.SendMessageParams{ChatID: chatID, Text: "Инфо о товаре"})
+		callback := update.CallbackQuery
+		chatID := telego.ChatID{ID: callback.Message.GetChat().ID}
+		itemID, err := strconv.ParseInt(strings.Split(callback.Data, " ")[1], 10, 64)
+		item, err := Items.GetByID(int(itemID), db)
+		if err != nil {
+			bot.SendMessage(ctx, &telego.SendMessageParams{ChatID: chatID, Text: "Произошла ошибка, обратитесь к владельцу"})
+			return err
+		}
+		_, err = bot.SendPhoto(ctx, &telego.SendPhotoParams{Photo: telego.InputFile{FileID: item.PhotoId}, ChatID: chatID, Caption: fmt.Sprintf("Инфо о товаре:\n%v\nТип:%v\nОписание:\n%v\nСтоимость:%v ₽", item.Name, item.Type, item.Description, item.Price)})
+		if err != nil {
+			bot.SendMessage(ctx, &telego.SendMessageParams{ChatID: chatID, Text: fmt.Sprintf("Инфо о товаре:\n%v\nТип:%v\nОписание:\n%v\nСтоимость:%v ₽", item.Name, item.Type, item.Description, item.Price)})
+		}
 		return nil
-	}, th.CallbackDataEqual("item"))
+	}, th.CallbackDataContains("item"))
 }

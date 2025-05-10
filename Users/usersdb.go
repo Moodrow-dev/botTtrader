@@ -1,6 +1,7 @@
 package Users
 
 import (
+	"botTtrader/Items"
 	"database/sql"
 	"fmt"
 	_ "github.com/mattn/go-sqlite3"
@@ -9,13 +10,14 @@ import (
 )
 
 type User struct {
-	ID        int64     `json:"id"`
-	Name      string    `json:"name"`
-	Phone     string    `json:"phone"`
-	Account   string    `json:"account"`
-	Address   string    `json:"address"`
-	IsOwner   bool      `json:"isOwner"`
-	CreatedAt time.Time `json:"createdAt"`
+	ID           int64        `json:"id"`
+	Name         string       `json:"name"`
+	Phone        string       `json:"phone"`
+	Account      string       `json:"account"`
+	Address      string       `json:"address"`
+	ShoppingCart []Items.Item `json:"shopping_cart"`
+	IsOwner      bool         `json:"isOwner"`
+	CreatedAt    time.Time    `json:"createdAt"`
 }
 
 // InitDB инициализирует таблицу пользователей
@@ -29,6 +31,15 @@ func InitDB(db *sql.DB) error {
 		is_owner BOOLEAN DEFAULT FALSE,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	)`)
+	// Создаем таблицу товаров в корзине
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS order_items (
+		order_id INTEGER NOT NULL,
+		item_id INTEGER NOT NULL,
+		quantity INTEGER DEFAULT 1,
+		PRIMARY KEY (order_id, item_id),
+		FOREIGN KEY (order_id) REFERENCES users(id) ON DELETE CASCADE,
+		FOREIGN KEY (item_id) REFERENCES items(id)
+	)`)
 	if err != nil {
 		return fmt.Errorf("ошибка создания таблицы users: %v", err)
 	}
@@ -37,7 +48,7 @@ func InitDB(db *sql.DB) error {
 
 // Save сохраняет пользователя в БД
 func Save(user User, db *sql.DB) error {
-	_, err := db.Exec(
+	_, err := tx.Exec(
 		`INSERT INTO users (id, name, phone, account, address, is_owner) 
 		VALUES (?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
@@ -53,6 +64,7 @@ func Save(user User, db *sql.DB) error {
 		user.Address,
 		user.IsOwner,
 	)
+
 	return err
 }
 

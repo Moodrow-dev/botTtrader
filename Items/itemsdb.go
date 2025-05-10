@@ -13,6 +13,7 @@ type Item struct {
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
 	Price       float64   `json:"price"`
+	PhotoId     string    `json:"photo_id"`
 	CreatedAt   time.Time `json:"createdAt"`
 }
 
@@ -24,6 +25,7 @@ func InitDB(db *sql.DB) error {
 		name TEXT NOT NULL,
 		description TEXT,
 		price REAL NOT NULL CHECK(price >= 0),
+		photo_id TEXT NOT NULL,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	)`)
 	if err != nil {
@@ -35,18 +37,20 @@ func InitDB(db *sql.DB) error {
 // Save сохраняет товар в БД
 func Save(item Item, db *sql.DB) error {
 	_, err := db.Exec(
-		`INSERT INTO items (id, type, name, description, price) 
-		VALUES (?, ?, ?, ?, ?)
+		`INSERT INTO items (id, type, name, description, price, photo_id) 
+		VALUES (?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			type = excluded.type,
 			name = excluded.name,
 			description = excluded.description,
-			price = excluded.price`,
+			price = excluded.price,
+			photo_id = excluded.photo_id`,
 		item.ID,
 		item.Type,
 		item.Name,
 		item.Description,
 		item.Price,
+		item.PhotoId,
 	)
 	return err
 }
@@ -55,7 +59,7 @@ func Save(item Item, db *sql.DB) error {
 func GetByID(id int, db *sql.DB) (Item, error) {
 	var item Item
 	err := db.QueryRow(
-		`SELECT id, type, name, description, price, created_at 
+		`SELECT id, type, name, description, price, photo_id, created_at 
 		FROM items WHERE id = ?`,
 		id,
 	).Scan(
@@ -64,6 +68,7 @@ func GetByID(id int, db *sql.DB) (Item, error) {
 		&item.Name,
 		&item.Description,
 		&item.Price,
+		&item.PhotoId,
 		&item.CreatedAt,
 	)
 
@@ -80,7 +85,7 @@ func GetByID(id int, db *sql.DB) (Item, error) {
 // GetAll возвращает все товары
 func GetAll(db *sql.DB) ([]Item, error) {
 	rows, err := db.Query(
-		`SELECT id, type, name, description, price, created_at 
+		`SELECT id, type, name, description, price, photo_id, created_at 
 		FROM items ORDER BY created_at DESC`,
 	)
 	if err != nil {
@@ -97,6 +102,7 @@ func GetAll(db *sql.DB) ([]Item, error) {
 			&item.Name,
 			&item.Description,
 			&item.Price,
+			&item.PhotoId,
 			&item.CreatedAt,
 		); err != nil {
 			log.Printf("Ошибка чтения товара: %v", err)
@@ -134,7 +140,7 @@ func Delete(id int, db *sql.DB) error {
 // GetByType возвращает товары определенного типа
 func GetByType(itemType string, db *sql.DB) ([]Item, error) {
 	rows, err := db.Query(
-		`SELECT id, type, name, description, price, created_at 
+		`SELECT id, type, name, description, price, photo_id, created_at 
 		FROM items WHERE type = ? ORDER BY name`,
 		itemType,
 	)
@@ -152,6 +158,7 @@ func GetByType(itemType string, db *sql.DB) ([]Item, error) {
 			&item.Name,
 			&item.Description,
 			&item.Price,
+			&item.PhotoId,
 			&item.CreatedAt,
 		); err != nil {
 			log.Printf("Ошибка чтения товара: %v", err)
