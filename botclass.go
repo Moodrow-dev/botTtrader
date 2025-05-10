@@ -1,36 +1,17 @@
 package main
 
-type User struct {
-	ID      int64  `bson:"id"`
-	Name    string `bson:"name"`
-	Phone   int    `bson:"phone"`
-	Account string `bson:"account"`
-	Address string `bson:"address"`
-	isOwner bool
-}
+import (
+	"botTtrader/Items"
+	"botTtrader/Users"
+)
 
 type Bot struct {
-	Owner   User   `json:"owner"`
-	Channel string `json:"channel"`
-}
-
-type Item struct {
-	ID    int     `bson:"id"`
-	Title string  `bson:"title"`
-	Info  string  `bson:"info"`
-	Price float64 `bson:"price"`
-}
-
-type Order struct {
-	Customer *User  `bson:"customer"`
-	Items    []Item `bson:"items"`
-	ID       int    `bson:"id"`
-	Track    string `bson:"track"`
-	IsPaid   bool   `bson:"isPaid"`
+	Owner   *Users.User `json:"owner"`
+	Channel string      `json:"channel"`
 }
 
 type Store struct {
-	Name  string `json:"name"`
-	Items []Item `json:"items"`
-	Owner *User  `json:"owner"`
+	Name  string        `json:"name"`
+	Items []*Items.Item `json:"items"`
+	Owner *Users.User   `json:"owner"`
 }

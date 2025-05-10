@@ -1,7 +1,9 @@
 package main
 
 import (
+	"botTtrader/Users"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"github.com/joho/godotenv"
@@ -11,8 +13,7 @@ import (
 	"os"
 )
 
-func createBotAndPoll() (*telego.Bot, *th.BotHandler, *Owner, error) {
-	owner := Owner{}
+func createBotAndPoll() (*telego.Bot, *th.BotHandler, *Users.User, error) {
 	err := godotenv.Load("settings.env")
 	if err != nil {
 		log.Fatal("Error loading .env file")
@@ -30,8 +31,9 @@ func createBotAndPoll() (*telego.Bot, *th.BotHandler, *Owner, error) {
 	return bot, bh, &owner, nil
 }
 
-func getInfoAboutOwner(owner *Owner) {
-	if owner == nil {
+func getInfoAboutOwner(db *sql.DB) {
+	owner, err := Users.GetOwner(db)
+	if err == nil {
 		//
 	} else {
 		//
@@ -47,7 +49,7 @@ func addOwnerInfo(bh *th.BotHandler) {
 	}, th.AnyMessage())
 }
 
-func writeOwner(owner *Owner) {
+func writeOwner(owner *Users.User) {
 	user, err := json.Marshal(owner)
 	if err != nil {
 		log.Fatal(err)
@@ -57,8 +59,8 @@ func writeOwner(owner *Owner) {
 
 }
 
-func readOwner(name string) *Owner {
-	newOwn := &Owner{}
+func readOwner(name string) *Users.User {
+	newOwn := &Users.User{}
 	file, _ := os.ReadFile(name)
 	err := json.Unmarshal(file, &newOwn)
 	if err != nil {
