@@ -1,4 +1,4 @@
-package main
+package Utils
 
 import (
 	"botTtrader/Users"
@@ -10,9 +10,10 @@ import (
 	th "github.com/mymmrac/telego/telegohandler"
 	"log"
 	"os"
+	"strings"
 )
 
-func createBotAndPoll() (*telego.Bot, *th.BotHandler, error) {
+func CreateBotAndPoll() (*telego.Bot, *th.BotHandler, error) {
 	err := godotenv.Load("settings.env")
 	if err != nil {
 		log.Fatal("Error loading .env file")
@@ -66,4 +67,24 @@ func readOwner(name string) *Users.User {
 		return nil
 	}
 	return newOwn
+}
+
+func DeleteThis(bh *th.BotHandler) {
+	bh.Handle(func(ctx *th.Context, update telego.Update) error {
+		callback := update.CallbackQuery
+		chatID := telego.ChatID{ID: callback.Message.GetChat().ID}
+		messageID := callback.Message.GetMessageID()
+		bot := ctx.Bot()
+		bot.DeleteMessage(ctx, &telego.DeleteMessageParams{chatID, messageID})
+		return nil
+	}, th.CallbackDataEqual("deleteThis"))
+}
+
+// EscapeMarkdown экранирует специальные символы MarkdownV2
+func EscapeMarkdown(text string) string {
+	chars := []string{"_", "*", "[", "]", "(", ")", "~", "`", ">", "#", "+", "-", "=", "|", "{", "}", ".", "!"}
+	for _, char := range chars {
+		text = strings.ReplaceAll(text, char, "\\"+char)
+	}
+	return text
 }

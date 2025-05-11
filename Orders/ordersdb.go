@@ -11,12 +11,12 @@ import (
 )
 
 type Order struct {
-	ID       int
-	Time     time.Time
-	Customer *Users.User
-	Items    []*Items.Item
-	Track    string
-	IsPaid   bool
+	ID       int           `json:"id"`
+	Time     time.Time     `json:"time"`
+	Customer *Users.User   `json:"customer_id"`
+	Items    []*Items.Item `json:"items"`
+	Track    string        `json:"track"`
+	IsPaid   bool          `json:"is_paid"`
 }
 
 func InitDB(db *sql.DB) error {
@@ -104,7 +104,7 @@ func GetByID(id int, db *sql.DB) (*Order, error) {
 
 	// Получаем основной заказ
 	var order Order
-	var customerID int
+	var customerID int64
 
 	err = tx.QueryRow(`
 		SELECT id, time, customer_id, track, is_paid 
@@ -120,7 +120,7 @@ func GetByID(id int, db *sql.DB) (*Order, error) {
 	}
 
 	// Получаем данные покупателя
-	order.Customer, err = Users.GetByID(customerID, tx)
+	order.Customer, err = Users.GetByID(customerID, db)
 	if err != nil {
 		return nil, err
 	}

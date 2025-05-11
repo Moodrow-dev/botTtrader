@@ -2,10 +2,9 @@ package main
 
 import (
 	"botTtrader/Customer"
-	"botTtrader/Items"
+	"botTtrader/Utils"
 	"database/sql"
 	"log"
-	"time"
 )
 
 func main() {
@@ -15,13 +14,19 @@ func main() {
 		log.Fatal(err)
 	}
 
-	Items.InitDB(db)
-	Items.Save(Items.Item{1, "Pin", "Товар 1", "Первый пробный товар", 100, "123", time.Now()}, db)
-	_, bh, _ := createBotAndPoll()
+	//Items.InitDB(db)
+	//Users.InitDB(db)
+	//Orders.InitDB(db)
+	//Items.Save(Items.Item{1, "Pin", "Товар 1", "Первый пробный товар", 100, "123", time.Now()}, db)
+	_, bh, _ := Utils.CreateBotAndPoll()
 
-	Customer.Menu(bh)
-	Customer.Price(bh, db)
-	Customer.GetInfoAboutItem(bh, db)
+	Utils.DeleteThis(bh)
+
+	Customer.Menu(bh, db)
+	Customer.Catalog(bh, db)
+	Customer.ItemInfo(bh, db)
+	Customer.MyCart(bh, db)
+	Customer.Cabinet(bh, db)
 
 	go func() {
 		err1 := bh.Start()
