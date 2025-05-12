@@ -53,7 +53,7 @@ func Cabinet(bh *th.BotHandler, db *sql.DB) {
 				"*Username:* @%s\n"+
 				"*Скидка:* %d%%\n"+
 				"*Телефон:* %s\n"+
-				"*Адрес:* %s\n"+
+				"*Адрес:* `%s`\n"+
 				"*ID:* `%d`\n\n"+
 				"Для заказов нужны: ФИО, Адрес и Телефон",
 			Utils.EscapeMarkdown(user.Name),
@@ -103,6 +103,7 @@ func Cabinet(bh *th.BotHandler, db *sql.DB) {
 
 // SetupEditHandlers настраивает обработчики для редактирования профиля
 func SetupEditHandlers(bh *th.BotHandler, db *sql.DB) {
+	var state byte
 	// Изменение имени
 	bh.Handle(func(ctx *th.Context, update telego.Update) error {
 		// Проверки на nil аналогично Cabinet
@@ -121,7 +122,7 @@ func SetupEditHandlers(bh *th.BotHandler, db *sql.DB) {
 		if err != nil {
 			log.Printf("Failed to request name change: %v", err)
 		}
-
+		state = stateEditingName
 		// Устанавливаем состояние "редактирование имени"
 		// Здесь можно использовать map или БД для хранения состояний
 		return nil
@@ -146,6 +147,7 @@ func SetupEditHandlers(bh *th.BotHandler, db *sql.DB) {
 			log.Printf("Failed to request phone change: %v", err)
 		}
 
+		state = stateEditingPhone
 		// Устанавливаем состояние "редактирование телефона"
 		return nil
 	}, th.CallbackDataEqual("change_phone"))
@@ -168,7 +170,7 @@ func SetupEditHandlers(bh *th.BotHandler, db *sql.DB) {
 		if err != nil {
 			log.Printf("Failed to request address change: %v", err)
 		}
-
+		state = stateEditingAddress
 		// Устанавливаем состояние "редактирование адреса"
 		return nil
 	}, th.CallbackDataEqual("change_address"))
@@ -191,24 +193,23 @@ func SetupEditHandlers(bh *th.BotHandler, db *sql.DB) {
 			return err
 		}
 
-		// Проверяем состояние пользователя (здесь нужна реализация машины состояний)
-		// Для примера - упрощенная версия
-
 		var successMessage string
 
-		// Проверяем, какое поле обновляем (в реальном коде это должно быть через состояния)
-		if strings.Contains(text, "+7") || regexp.MustCompile(`\d{11}`).MatchString(text) {
+		if state == stateEditingPhone && (strings.Contains(text, "+7") || regexp.MustCompile(`\d{11}`).MatchString(text)) {
 			// Обновляем телефон
 			user.Phone = text
 			successMessage = "✅ Номер телефона успешно обновлен!"
-		} else if len(text) > 20 && strings.Contains(text, ",") {
+			state = stateNormal
+		} else if state == stateEditingAddress && len(text) > 20 && strings.Contains(text, ",") {
 			// Обновляем адрес
 			user.Address = text
 			successMessage = "✅ Адрес успешно обновлен!"
-		} else {
+			state = stateNormal
+		} else if state == stateEditingName {
 			// Обновляем имя
 			user.Name = text
 			successMessage = "✅ ФИО успешно обновлено!"
+			state = stateNormal
 		}
 
 		// Сохраняем изменения

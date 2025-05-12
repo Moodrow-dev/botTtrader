@@ -8,25 +8,34 @@ import (
 )
 
 type Item struct {
-	ID          int       `json:"id"`
+	ID          int64     `json:"id"`
 	Type        string    `json:"type"`
 	Name        string    `json:"name"`
+	Quantity    int       `json:"quantity"`
 	Description string    `json:"description"`
 	Price       float64   `json:"price"`
 	PhotoId     string    `json:"photo_id"`
 	CreatedAt   time.Time `json:"createdAt"`
 }
 
+func Drop(db *sql.DB) {
+	_, err := db.Exec("DROP TABLE items")
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 // InitDB инициализирует таблицу товаров
 func InitDB(db *sql.DB) error {
 	_, err := db.Exec(`CREATE TABLE IF NOT EXISTS items (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		type TEXT NOT NULL,
-		name TEXT NOT NULL,
-		description TEXT,
-		price REAL NOT NULL CHECK(price >= 0),
-		photo_id TEXT NOT NULL,
-		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	type TEXT NOT NULL,
+	name TEXT NOT NULL,
+	quantity INT NOT NULL,
+	description TEXT,
+	price FLOAT NOT NULL CHECK(price >= 0),
+	photo_id TEXT NOT NULL,
+	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	)`)
 	if err != nil {
 		return fmt.Errorf("ошибка создания таблицы items: %v", err)
@@ -37,17 +46,19 @@ func InitDB(db *sql.DB) error {
 // Save сохраняет товар в БД
 func Save(item Item, db *sql.DB) error {
 	_, err := db.Exec(
-		`INSERT INTO items (id, type, name, description, price, photo_id) 
-		VALUES (?, ?, ?, ?, ?, ?)
-		ON CONFLICT(id) DO UPDATE SET
-			type = excluded.type,
-			name = excluded.name,
-			description = excluded.description,
-			price = excluded.price,
-			photo_id = excluded.photo_id`,
+		`INSERT INTO items (id, type, name, quantity, description, price, photo_id)
+	VALUES (?, ?, ?, ?, ?, ?, ?)
+	ON CONFLICT(id) DO UPDATE SET
+	type = excluded.type,
+	name = excluded.name,
+	quantity = excluded.quantity,
+	description = excluded.description,
+	price = excluded.price,
+	photo_id = excluded.photo_id`,
 		item.ID,
 		item.Type,
 		item.Name,
+		item.Quantity,
 		item.Description,
 		item.Price,
 		item.PhotoId,
@@ -56,16 +67,17 @@ func Save(item Item, db *sql.DB) error {
 }
 
 // GetByID возвращает товар по ID
-func GetByID(id int, db *sql.DB) (Item, error) {
+func GetByID(id int64, db *sql.DB) (Item, error) {
 	var item Item
 	err := db.QueryRow(
-		`SELECT id, type, name, description, price, photo_id, created_at 
-		FROM items WHERE id = ?`,
+		`SELECT id, type, name, quantity, description, price, photo_id, created_at
+	FROM items WHERE id = ?`,
 		id,
 	).Scan(
 		&item.ID,
 		&item.Type,
 		&item.Name,
+		&item.Quantity,
 		&item.Description,
 		&item.Price,
 		&item.PhotoId,
@@ -85,8 +97,8 @@ func GetByID(id int, db *sql.DB) (Item, error) {
 // GetAll возвращает все товары
 func GetAll(db *sql.DB) ([]Item, error) {
 	rows, err := db.Query(
-		`SELECT id, type, name, description, price, photo_id, created_at 
-		FROM items ORDER BY created_at DESC`,
+		`SELECT id, type, name, quantity, description, price, photo_id, created_at
+	FROM items ORDER BY created_at DESC`,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка получения товаров: %v", err)
@@ -100,6 +112,7 @@ func GetAll(db *sql.DB) ([]Item, error) {
 			&item.ID,
 			&item.Type,
 			&item.Name,
+			&item.Quantity,
 			&item.Description,
 			&item.Price,
 			&item.PhotoId,
@@ -140,8 +153,8 @@ func Delete(id int, db *sql.DB) error {
 // GetByType возвращает товары определенного типа
 func GetByType(itemType string, db *sql.DB) ([]Item, error) {
 	rows, err := db.Query(
-		`SELECT id, type, name, description, price, photo_id, created_at 
-		FROM items WHERE type = ? ORDER BY name`,
+		`SELECT id, type, name, quantity, description, price, photo_id, created_at
+	FROM items WHERE type = ? ORDER BY name`,
 		itemType,
 	)
 	if err != nil {
@@ -156,6 +169,7 @@ func GetByType(itemType string, db *sql.DB) ([]Item, error) {
 			&item.ID,
 			&item.Type,
 			&item.Name,
+			&item.Quantity,
 			&item.Description,
 			&item.Price,
 			&item.PhotoId,

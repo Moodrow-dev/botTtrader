@@ -17,7 +17,7 @@ func errMsg(bot *telego.Bot, id telego.ChatID) {
 
 func Menu(bh *th.BotHandler, db *sql.DB) {
 	kb := tu.InlineKeyboard(tu.InlineKeyboardCols(3, []telego.InlineKeyboardButton{
-		{Text: "🛍 Товары", CallbackData: "catalog"},
+		{Text: "🛍 Товары", CallbackData: "`catalog`"},
 		{Text: "🛒 Корзина", CallbackData: "mycart"},
 		{Text: "📇 Личный кабинет", CallbackData: "cabinet"},
 		{Text: "📱 Поддержка", CallbackData: "support"}}...)...)

@@ -7,6 +7,7 @@ import (
 	"github.com/mymmrac/telego"
 	th "github.com/mymmrac/telego/telegohandler"
 	tu "github.com/mymmrac/telego/telegoutil"
+	"log"
 	"strconv"
 	"strings"
 )
@@ -17,7 +18,7 @@ func ItemInfo(bh *th.BotHandler, db *sql.DB) {
 		callback := update.CallbackQuery
 		chatID := telego.ChatID{ID: callback.Message.GetChat().ID}
 		itemID, err := strconv.ParseInt(strings.Split(callback.Data, " ")[1], 10, 64)
-		item, err := Items.GetByID(int(itemID), db)
+		item, err := Items.GetByID(itemID, db)
 		kb := tu.InlineKeyboard([]telego.InlineKeyboardButton{{Text: "Добавить в корзину", CallbackData: fmt.Sprintf("addToCart %v", itemID)}, {Text: "Купить сейчас", CallbackData: fmt.Sprintf("buyNow %v", itemID)}, {Text: "Закрыть", CallbackData: "deleteThis"}})
 		if err != nil {
 			errMsg(bot, chatID)
@@ -33,6 +34,7 @@ func ItemInfo(bh *th.BotHandler, db *sql.DB) {
 
 func Catalog(bh *th.BotHandler, db *sql.DB) {
 	bh.Handle(func(ctx *th.Context, update telego.Update) error {
+		log.Printf("Catalog")
 		bot := ctx.Bot()
 		callback := update.CallbackQuery
 		chatID := telego.ChatID{ID: callback.Message.GetChat().ID}
@@ -45,9 +47,11 @@ func Catalog(bh *th.BotHandler, db *sql.DB) {
 		btns := []telego.InlineKeyboardButton{}
 		if len(items) > 0 {
 			for _, item := range items {
-				btns = append(btns, telego.InlineKeyboardButton{Text: item.Name, CallbackData: fmt.Sprintf("item %v", item.ID)})
+				if item.Quantity != 0 {
+					btns = append(btns, telego.InlineKeyboardButton{Text: item.Name, CallbackData: fmt.Sprintf("item %v", item.ID)})
+				}
 			}
-			btns = append(btns, telego.InlineKeyboardButton{Text: "Назад", CallbackData: "customer_menu"})
+			btns = append(btns, telego.InlineKeyboardButton{Text: "🔙 Назад", CallbackData: "customer_menu"})
 			kb := tu.InlineKeyboard(btns)
 			bot.EditMessageText(ctx, &telego.EditMessageTextParams{MessageID: messageID, ReplyMarkup: kb, Text: "Вот текущий ассортимент:", ChatID: chatID})
 		} else {

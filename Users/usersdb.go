@@ -12,18 +12,25 @@ import (
 )
 
 type User struct {
-	ID           int64         `json:"id"`
-	Name         string        `json:"name"`
-	Phone        string        `json:"phone"`
-	Account      string        `json:"account"`
-	Address      string        `json:"address"`
-	Discount     int           `json:"discount"`
-	ShoppingCart []*Items.Item `json:"shopping_cart"`
-	IsOwner      bool          `json:"isOwner"`
-	CreatedAt    time.Time     `json:"createdAt"`
+	ID           int64               `json:"id"`
+	Name         string              `json:"name"`
+	Phone        string              `json:"phone"`
+	Account      string              `json:"account"`
+	Address      string              `json:"address"`
+	Discount     int                 `json:"discount"`
+	ShoppingCart map[*Items.Item]int `json:"shopping_cart"` // Key: item, Value: quantity
+	IsOwner      bool                `json:"isOwner"`
+	CreatedAt    time.Time           `json:"createdAt"`
 }
 
-// NewUser creates a new user with safe defaults.
+func Drop(db *sql.DB) {
+	_, err := db.Exec("DROP TABLE users")
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+// NewUser создает нового пользователя с безопасными значениями по умолчанию
 func NewUser(user *telego.User, isOwner bool) *User {
 	name := user.FirstName
 	if user.LastName != "" {
@@ -39,18 +46,18 @@ func NewUser(user *telego.User, isOwner bool) *User {
 		Account:      user.Username,
 		Address:      "",
 		Discount:     0,
-		ShoppingCart: []*Items.Item{},
+		ShoppingCart: make(map[*Items.Item]int),
 		IsOwner:      isOwner,
-		CreatedAt:    time.Now(), // Set explicitly for consistency
+		CreatedAt:    time.Now(),
 	}
 }
 
-// InitDB initializes the users and shopping_carts tables.
+// InitDB инициализирует таблицы пользователей и корзин
 func InitDB(db *sql.DB) error {
 	_, err := db.Exec(`CREATE TABLE IF NOT EXISTS users (
 		id INTEGER PRIMARY KEY,
 		name TEXT NOT NULL,
-		phone TEXT, -- Relaxed NOT NULL and UNIQUE constraints
+		phone TEXT,
 		account TEXT,
 		address TEXT,
 		discount INTEGER DEFAULT 0,
@@ -60,27 +67,31 @@ func InitDB(db *sql.DB) error {
 	if err != nil {
 		return fmt.Errorf("failed to create users table: %v", err)
 	}
+
 	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS shopping_carts (
 		user_id INTEGER NOT NULL,
 		item_id INTEGER NOT NULL,
-		quantity INTEGER DEFAULT 1,
+		quantity INTEGER NOT NULL DEFAULT 1,
 		PRIMARY KEY (user_id, item_id),
 		FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-		FOREIGN KEY (item_id) REFERENCES items(id)
+		FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
 	)`)
 	if err != nil {
 		return fmt.Errorf("failed to create shopping_carts table: %v", err)
 	}
+
 	return nil
 }
 
-// Save persists a user and their shopping cart to the database.
+// Save сохраняет пользователя и его корзину
 func Save(user *User, db *sql.DB) error {
 	tx, err := db.Begin()
 	if err != nil {
-		return fmt.Errorf("failed to begin transaction for user %d: %v", user.ID, err)
+		return fmt.Errorf("failed to begin transaction: %v", err)
 	}
+	defer tx.Rollback()
 
+	// Сохраняем основную информацию о пользователе
 	_, err = tx.Exec(
 		`INSERT INTO users (id, name, phone, account, address, discount, is_owner) 
 		VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -100,46 +111,46 @@ func Save(user *User, db *sql.DB) error {
 		user.IsOwner,
 	)
 	if err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to save user %d: %v", user.ID, err)
+		return fmt.Errorf("failed to save user: %v", err)
 	}
 
+	// Очищаем старую корзину
 	_, err = tx.Exec("DELETE FROM shopping_carts WHERE user_id = ?", user.ID)
 	if err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to delete shopping cart for user %d: %v", user.ID, err)
+		return fmt.Errorf("failed to clear shopping cart: %v", err)
 	}
 
-	for _, item := range user.ShoppingCart {
-		if item == nil || item.ID == 0 {
-			tx.Rollback()
-			return fmt.Errorf("invalid item in shopping cart for user %d", user.ID)
-		}
+	// Сохраняем товары в корзине
+	for item, quantity := range user.ShoppingCart {
 		_, err = tx.Exec(
 			"INSERT INTO shopping_carts (user_id, item_id, quantity) VALUES (?, ?, ?)",
 			user.ID,
 			item.ID,
-			1, // Explicitly set quantity
+			quantity,
 		)
 		if err != nil {
-			tx.Rollback()
-			return fmt.Errorf("failed to save cart item %d for user %d: %v", item.ID, user.ID, err)
+			return fmt.Errorf("failed to save cart item: %v", err)
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to commit transaction for user %d: %v", user.ID, err)
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %v", err)
 	}
 
-	log.Printf("Successfully saved user %d with %d cart items", user.ID, len(user.ShoppingCart))
 	return nil
 }
 
-// GetByID retrieves a user by ID, including their shopping cart.
+// GetByID получает пользователя по ID с корзиной
 func GetByID(id int64, db *sql.DB) (*User, error) {
+	tx, err := db.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %v", err)
+	}
+	defer tx.Rollback()
+
+	// Получаем основную информацию о пользователе
 	var user User
-	err := db.QueryRow(
+	err = tx.QueryRow(
 		`SELECT id, name, phone, account, address, discount, is_owner, created_at 
 		FROM users WHERE id = ?`,
 		id,
@@ -155,37 +166,77 @@ func GetByID(id int64, db *sql.DB) (*User, error) {
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("user %d not found", id)
+			return nil, fmt.Errorf("user not found")
 		}
-		return nil, fmt.Errorf("failed to get user %d: %v", id, err)
+		return nil, fmt.Errorf("failed to get user: %v", err)
 	}
 
-	// Fetch shopping cart items
-	rows, err := db.Query(`
-		SELECT i.id, i.name, i.price, i.type, i.description, i.photo_id
+	// Инициализируем корзину
+	user.ShoppingCart = make(map[*Items.Item]int)
+
+	// Получаем товары в корзине
+	rows, err := tx.Query(`
+		SELECT i.id, i.name, i.price, i.type, i.description, i.photo_id, sc.quantity
 		FROM shopping_carts sc
 		JOIN items i ON sc.item_id = i.id
 		WHERE sc.user_id = ?`, id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get shopping cart for user %d: %v", id, err)
+		return nil, fmt.Errorf("failed to get shopping cart: %v", err)
 	}
 	defer rows.Close()
 
 	for rows.Next() {
 		var item Items.Item
-		err = rows.Scan(&item.ID, &item.Name, &item.Price, &item.Type, &item.Description, &item.PhotoId)
+		var quantity int
+		err = rows.Scan(
+			&item.ID,
+			&item.Name,
+			&item.Price,
+			&item.Type,
+			&item.Description,
+			&item.PhotoId,
+			&quantity,
+		)
 		if err != nil {
-			log.Printf("Failed to scan cart item for user %d: %v", id, err)
+			log.Printf("Failed to scan cart item: %v", err)
 			continue
 		}
-		user.ShoppingCart = append(user.ShoppingCart, &item)
+		user.ShoppingCart[&item] = quantity
 	}
 
 	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating shopping cart for user %d: %v", id, err)
+		return nil, fmt.Errorf("error reading cart items: %v", err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %v", err)
 	}
 
 	return &user, nil
+}
+
+// Вспомогательные методы для работы с корзиной
+func (u *User) AddToCart(item *Items.Item, quantity int) {
+	if u.ShoppingCart == nil {
+		u.ShoppingCart = make(map[*Items.Item]int)
+	}
+	u.ShoppingCart[item] += quantity
+}
+
+func (u *User) RemoveFromCart(item Items.Item) {
+	delete(u.ShoppingCart, &item)
+}
+
+func (u *User) ClearCart() {
+	u.ShoppingCart = make(map[*Items.Item]int)
+}
+
+func (u *User) CartTotal() float64 {
+	total := 0.0
+	for item, quantity := range u.ShoppingCart {
+		total += item.Price * float64(quantity)
+	}
+	return total
 }
 
 // GetAllIDs returns all user IDs.
