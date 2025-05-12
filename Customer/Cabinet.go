@@ -140,7 +140,7 @@ func SetupEditHandlers(bh *th.BotHandler, db *sql.DB) {
 		_, err := bot.EditMessageText(ctx, &telego.EditMessageTextParams{
 			ChatID:    chatID,
 			MessageID: messageID,
-			Text:      "Введите ваш номер телефона (например: +79123456789):",
+			Text:      "Введите ваш номер телефона(можете поделиться контактом) (например: +79123456789):",
 		})
 
 		if err != nil {
@@ -185,6 +185,11 @@ func SetupEditHandlers(bh *th.BotHandler, db *sql.DB) {
 		userID := update.Message.From.ID
 		chatID := telego.ChatID{ID: update.Message.Chat.ID}
 		text := update.Message.Text
+		contact := update.Message.Contact
+		var phone string
+		if contact != nil {
+			phone = "+" + contact.PhoneNumber
+		}
 
 		// Получаем пользователя
 		user, err := Users.GetByID(userID, db)
@@ -195,9 +200,13 @@ func SetupEditHandlers(bh *th.BotHandler, db *sql.DB) {
 
 		var successMessage string
 
-		if state == stateEditingPhone && (strings.Contains(text, "+7") || regexp.MustCompile(`\d{11}`).MatchString(text)) {
-			// Обновляем телефон
-			user.Phone = text
+		if state == stateEditingPhone {
+			if strings.Contains(text, "+7") || regexp.MustCompile(`\d{11}`).MatchString(text) {
+				// Обновляем телефон
+				user.Phone = text
+			} else if phone != "" {
+				user.Phone = phone
+			}
 			successMessage = "✅ Номер телефона успешно обновлен!"
 			state = stateNormal
 		} else if state == stateEditingAddress && len(text) > 20 && strings.Contains(text, ",") {
@@ -237,5 +246,5 @@ func SetupEditHandlers(bh *th.BotHandler, db *sql.DB) {
 		})
 
 		return nil
-	}, th.AnyMessageWithText())
+	}, th.AnyMessage())
 }
