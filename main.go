@@ -9,6 +9,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"math/rand"
 	"time"
 )
 
@@ -34,9 +35,9 @@ func main() {
 		log.Fatal(err)
 	}
 
+	itemTypes := []string{"Pin", "Sticker", "Doll"}
 	for i := range int64(15) {
-
-		err = Items.Save(Items.Item{i, "Pin", fmt.Sprintf("Товар %v", i), int(i + 1), "Пробный товар", 100 * float64(i), "123", time.Now()}, db)
+		err = Items.Save(Items.Item{i, itemTypes[rand.Intn(3)], fmt.Sprintf("Товар %v", i), int(i + 1), "Пробный товар", 100 * float64(i), "123", time.Now()}, db)
 		if err != nil {
 			log.Fatal(err)
 		}

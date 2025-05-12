@@ -37,12 +37,12 @@ func MyCart(bh *th.BotHandler, db *sql.DB) {
 		callback := update.CallbackQuery
 		chatID := telego.ChatID{ID: callback.Message.GetChat().ID}
 		messageID := callback.Message.GetMessageID()
-		items, err := Items.GetAll(db)
+		user, err := Users.GetByID(callback.From.ID, db)
 		itemPage, err := strconv.ParseInt(strings.Split(callback.Data, " ")[1], 10, 64)
 		if err != nil {
 			errMsg(bot, chatID)
 		}
-		ShowPage(int(itemPage), items, bot, ctx, chatID, messageID)
+		ShowCartPage(int(itemPage), user.ShoppingCart, bot, ctx, chatID, messageID)
 		return nil
 	}, th.CallbackDataContains("cartPage"))
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/mymmrac/telego"
 	th "github.com/mymmrac/telego/telegohandler"
 	tu "github.com/mymmrac/telego/telegoutil"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -38,22 +39,45 @@ func Catalog(bh *th.BotHandler, db *sql.DB) {
 		CDslc := strings.Split(callback.Data, " ")
 		chatID := telego.ChatID{ID: callback.Message.GetChat().ID}
 		messageID := callback.Message.GetMessageID()
-		var items []*Items.Item
-		var itemType string
-		var err error
-		if len(CDslc) == 2 {
+		items, err := Items.GetAll(db)
+		itemType := "Все"
+		if len(CDslc) != 1 && CDslc[1] != itemType {
 			itemType = CDslc[1]
 			items, err = Items.GetByType(itemType, db)
-		} else {
-			items, err := Items.GetAll(db)
 		}
 		if err != nil {
 			errMsg(bot, chatID)
 			return err
 		}
-		ShowPage(0, items, bot, ctx, chatID, messageID)
+		ShowPage(0, itemType, items, bot, ctx, chatID, messageID)
 		return nil
 	}, th.CallbackDataContains("catalog"))
+
+	bh.Handle(func(ctx *th.Context, update telego.Update) error {
+		bot := ctx.Bot()
+		callback := update.CallbackQuery
+		CDslc := strings.Split(callback.Data, " ")
+		chatID := telego.ChatID{ID: callback.Message.GetChat().ID}
+		messageID := callback.Message.GetMessageID()
+		items, err := Items.GetAll(db)
+		var itemPage int64
+		itemType := "Все"
+		if len(CDslc) == 3 {
+			itemType = CDslc[1]
+		}
+		itemPage, err = strconv.ParseInt(CDslc[2], 10, 64)
+		if err != nil {
+			errMsg(bot, chatID)
+		}
+		if itemType != "Все" {
+			items, err = Items.GetByType(itemType, db)
+		}
+		if err != nil {
+			errMsg(bot, chatID)
+		}
+		ShowPage(int(itemPage), itemType, items, bot, ctx, chatID, messageID)
+		return nil
+	}, th.CallbackDataContains("catPage"))
 
 	bh.Handle(func(ctx *th.Context, update telego.Update) error {
 		bot := ctx.Bot()
@@ -61,20 +85,35 @@ func Catalog(bh *th.BotHandler, db *sql.DB) {
 		chatID := telego.ChatID{ID: callback.Message.GetChat().ID}
 		messageID := callback.Message.GetMessageID()
 		items, err := Items.GetAll(db)
-		itemPage, err := strconv.ParseInt(strings.Split(callback.Data, " ")[1], 10, 64)
 		if err != nil {
 			errMsg(bot, chatID)
 		}
-		ShowPage(int(itemPage), items, bot, ctx, chatID, messageID)
-		return nil
-	}, th.CallbackDataContains("catPage"))
+		types := make(map[string]bool)
+		typesSlice := []string{}
+		for _, item := range items {
+			if types[item.Type] == false {
+				types[item.Type] = true
+				typesSlice = append(typesSlice, item.Type)
+			}
+		}
+		sort.Strings(typesSlice)
+		typesSlice = append(typesSlice, "Все")
+		btns := []telego.InlineKeyboardButton{}
+		for _, itemType := range typesSlice {
+			btns = append(btns, telego.InlineKeyboardButton{Text: itemType, CallbackData: fmt.Sprintf("catalog %v", itemType)})
+		}
 
-	bh.Handle(func(ctx *th.Context, update telego.Update) error {
+		btns = append(btns, telego.InlineKeyboardButton{
+			Text:         "🔙 Назад",
+			CallbackData: "catalog",
+		})
+		kb := tu.InlineKeyboard(tu.InlineKeyboardCols(1, btns...)...)
+		bot.EditMessageText(ctx, &telego.EditMessageTextParams{ReplyMarkup: kb, MessageID: messageID, ChatID: chatID, Text: "Выберите тип товара"})
 		return nil
-	}, th.CallbackDataContains("itemSortBy"))
+	}, th.CallbackDataContains("itemSort"))
 }
 
-func ShowPage(itemPage int, items []*Items.Item, bot *telego.Bot, ctx *th.Context, id telego.ChatID, messageID int) {
+func ShowPage(itemPage int, itemType string, items []*Items.Item, bot *telego.Bot, ctx *th.Context, id telego.ChatID, messageID int) {
 	backBtn := telego.InlineKeyboardButton{
 		Text:         "🔙 Назад",
 		CallbackData: "customer_menu",
@@ -124,17 +163,17 @@ func ShowPage(itemPage int, items []*Items.Item, bot *telego.Bot, ctx *th.Contex
 	if itemPage > 0 {
 		navButtons = append(navButtons, telego.InlineKeyboardButton{
 			Text:         "<< Назад",
-			CallbackData: fmt.Sprintf("catPage %v", itemPage-1),
+			CallbackData: fmt.Sprintf("catPage %v %v", itemType, itemPage-1),
 		})
 	}
 	navButtons = append(navButtons, telego.InlineKeyboardButton{
 		Text:         "Фильтр",
-		CallbackData: fmt.Sprintf("itemSort", itemPage),
+		CallbackData: "itemSort",
 	})
 	if itemPage < maxPage {
 		navButtons = append(navButtons, telego.InlineKeyboardButton{
 			Text:         "Вперед >>",
-			CallbackData: fmt.Sprintf("catPage %v", itemPage+1),
+			CallbackData: fmt.Sprintf("catPage %v %v", itemType, itemPage+1),
 		})
 	}
 
@@ -151,7 +190,7 @@ func ShowPage(itemPage int, items []*Items.Item, bot *telego.Bot, ctx *th.Contex
 	_, _ = bot.EditMessageText(ctx, &telego.EditMessageTextParams{
 		ChatID:      id,
 		MessageID:   messageID,
-		Text:        fmt.Sprintf("Страница %v/%v\nВыберите товар:", itemPage+1, maxPage+1),
+		Text:        fmt.Sprintf("Тип: %v\nСтраница %v/%v\nВыберите товар:", itemType, itemPage+1, maxPage+1),
 		ReplyMarkup: &kb,
 	})
 }
