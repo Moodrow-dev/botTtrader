@@ -42,8 +42,8 @@ func main() {
 
 	Utils.DeleteThis(bh)
 
-	Customer.Menu(bh, db)
 	Customer.Catalog(bh, db)
+	Customer.Menu(bh, db)
 	Customer.ItemInfo(bh, db)
 	Customer.MyCart(bh, db)
 	Customer.Cabinet(bh, db)

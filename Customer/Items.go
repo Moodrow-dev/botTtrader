@@ -7,7 +7,6 @@ import (
 	"github.com/mymmrac/telego"
 	th "github.com/mymmrac/telego/telegohandler"
 	tu "github.com/mymmrac/telego/telegoutil"
-	"log"
 	"strconv"
 	"strings"
 )
@@ -34,7 +33,6 @@ func ItemInfo(bh *th.BotHandler, db *sql.DB) {
 
 func Catalog(bh *th.BotHandler, db *sql.DB) {
 	bh.Handle(func(ctx *th.Context, update telego.Update) error {
-		log.Printf("Catalog")
 		bot := ctx.Bot()
 		callback := update.CallbackQuery
 		chatID := telego.ChatID{ID: callback.Message.GetChat().ID}
