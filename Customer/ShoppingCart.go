@@ -78,7 +78,7 @@ func AddItemToCart(bh *th.BotHandler, db *sql.DB) {
 		itemID, _ := strconv.ParseInt(strings.Split(callback.Data, " ")[1], 10, 64)
 		if err != nil {
 			item, _ := Items.GetByID(itemID, db)
-			user.AddToCart(&item, 1)
+			user.AddToCart(item, 1)
 			bot.EditMessageText(ctx, &telego.EditMessageTextParams{MessageID: messageID, ChatID: chatID, Text: fmt.Sprintf("Товар: %v добавлен в корзину", item.Name)})
 		}
 		Users.Save(user, db)

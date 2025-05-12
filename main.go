@@ -7,6 +7,7 @@ import (
 	"botTtrader/Users"
 	"botTtrader/Utils"
 	"database/sql"
+	"fmt"
 	"log"
 	"time"
 )
@@ -33,9 +34,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = Items.Save(Items.Item{1, "Pin", "Товар 1", -1, "Первый пробный товар", 100, "123", time.Now()}, db)
-	if err != nil {
-		log.Fatal(err)
+	for i := range int64(15) {
+
+		err = Items.Save(Items.Item{i, "Pin", fmt.Sprintf("Товар %v", i), int(i + 1), "Пробный товар", 100 * float64(i), "123", time.Now()}, db)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	_, bh, _ := Utils.CreateBotAndPoll()

@@ -42,19 +42,97 @@ func Catalog(bh *th.BotHandler, db *sql.DB) {
 			errMsg(bot, chatID)
 			return err
 		}
-		btns := []telego.InlineKeyboardButton{}
-		if len(items) > 0 {
-			for _, item := range items {
-				if item.Quantity != 0 {
-					btns = append(btns, telego.InlineKeyboardButton{Text: item.Name, CallbackData: fmt.Sprintf("item %v", item.ID)})
-				}
-			}
-			btns = append(btns, telego.InlineKeyboardButton{Text: "🔙 Назад", CallbackData: "customer_menu"})
-			kb := tu.InlineKeyboard(btns)
-			bot.EditMessageText(ctx, &telego.EditMessageTextParams{MessageID: messageID, ReplyMarkup: kb, Text: "Вот текущий ассортимент:", ChatID: chatID})
-		} else {
-			bot.EditMessageText(ctx, &telego.EditMessageTextParams{MessageID: messageID, ChatID: chatID, Text: "Пока в продаже ничего нет :("})
-		}
+		ShowPage(0, items, bot, ctx, chatID, messageID)
 		return nil
 	}, th.CallbackDataEqual("catalog"))
+	bh.Handle(func(ctx *th.Context, update telego.Update) error {
+		bot := ctx.Bot()
+		callback := update.CallbackQuery
+		chatID := telego.ChatID{ID: callback.Message.GetChat().ID}
+		messageID := callback.Message.GetMessageID()
+		items, err := Items.GetAll(db)
+		itemPage, err := strconv.ParseInt(strings.Split(callback.Data, " ")[1], 10, 64)
+		if err != nil {
+			errMsg(bot, chatID)
+		}
+		ShowPage(int(itemPage), items, bot, ctx, chatID, messageID)
+		return nil
+	}, th.CallbackDataContains("catPage"))
+}
+
+func ShowPage(itemPage int, items []*Items.Item, bot *telego.Bot, ctx *th.Context, id telego.ChatID, messageID int) {
+	if len(items) == 0 {
+		return
+	}
+
+	const itemsPerPage = 5
+	maxPage := (len(items) - 1) / itemsPerPage
+
+	if itemPage < 0 {
+		itemPage = 0
+	} else if itemPage > maxPage {
+		itemPage = maxPage
+	}
+
+	start := itemPage * itemsPerPage
+	end := start + itemsPerPage
+	if end > len(items) {
+		end = len(items)
+	}
+	pageItems := items[start:end]
+
+	var keyboardRows [][]telego.InlineKeyboardButton
+
+	for _, item := range pageItems {
+		btnText := item.Name
+		callbackData := fmt.Sprintf("item %v", item.ID)
+		if item.Quantity == 0 {
+			btnText = "Нет в наличии"
+			callbackData = ""
+		}
+
+		row := []telego.InlineKeyboardButton{
+			{
+				Text:         btnText,
+				CallbackData: callbackData,
+			},
+		}
+		keyboardRows = append(keyboardRows, row)
+	}
+
+	var navButtons []telego.InlineKeyboardButton
+	if itemPage > 0 {
+		navButtons = append(navButtons, telego.InlineKeyboardButton{
+			Text:         "<< Назад",
+			CallbackData: fmt.Sprintf("catPage %v", itemPage-1),
+		})
+	}
+	if itemPage < maxPage {
+		navButtons = append(navButtons, telego.InlineKeyboardButton{
+			Text:         "Вперед >>",
+			CallbackData: fmt.Sprintf("catPage %v", itemPage+1),
+		})
+	}
+
+	if len(navButtons) > 0 {
+		keyboardRows = append(keyboardRows, navButtons)
+	}
+
+	keyboardRows = append(keyboardRows, []telego.InlineKeyboardButton{
+		{
+			Text:         "🔙 Назад",
+			CallbackData: "customer_menu",
+		},
+	})
+
+	kb := telego.InlineKeyboardMarkup{
+		InlineKeyboard: keyboardRows,
+	}
+
+	_, _ = bot.EditMessageText(ctx, &telego.EditMessageTextParams{
+		ChatID:      id,
+		MessageID:   messageID,
+		Text:        fmt.Sprintf("Страница %v/%v\nВыберите товар:", itemPage+1, maxPage+1),
+		ReplyMarkup: &kb,
+	})
 }

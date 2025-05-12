@@ -67,7 +67,7 @@ func Save(item Item, db *sql.DB) error {
 }
 
 // GetByID возвращает товар по ID
-func GetByID(id int64, db *sql.DB) (Item, error) {
+func GetByID(id int64, db *sql.DB) (*Item, error) {
 	var item Item
 	err := db.QueryRow(
 		`SELECT id, type, name, quantity, description, price, photo_id, created_at
@@ -86,16 +86,16 @@ func GetByID(id int64, db *sql.DB) (Item, error) {
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return Item{}, fmt.Errorf("товар %d не найден", id)
+			return nil, fmt.Errorf("товар %d не найден", id)
 		}
-		return Item{}, fmt.Errorf("ошибка получения товара: %v", err)
+		return nil, fmt.Errorf("ошибка получения товара: %v", err)
 	}
 
-	return item, nil
+	return &item, nil
 }
 
 // GetAll возвращает все товары
-func GetAll(db *sql.DB) ([]Item, error) {
+func GetAll(db *sql.DB) ([]*Item, error) {
 	rows, err := db.Query(
 		`SELECT id, type, name, quantity, description, price, photo_id, created_at
 	FROM items ORDER BY created_at DESC`,
@@ -105,7 +105,7 @@ func GetAll(db *sql.DB) ([]Item, error) {
 	}
 	defer rows.Close()
 
-	var items []Item
+	var items []*Item
 	for rows.Next() {
 		var item Item
 		if err := rows.Scan(
@@ -121,7 +121,7 @@ func GetAll(db *sql.DB) ([]Item, error) {
 			log.Printf("Ошибка чтения товара: %v", err)
 			continue
 		}
-		items = append(items, item)
+		items = append(items, &item)
 	}
 
 	if err := rows.Err(); err != nil {
@@ -151,7 +151,7 @@ func Delete(id int, db *sql.DB) error {
 }
 
 // GetByType возвращает товары определенного типа
-func GetByType(itemType string, db *sql.DB) ([]Item, error) {
+func GetByType(itemType string, db *sql.DB) ([]*Item, error) {
 	rows, err := db.Query(
 		`SELECT id, type, name, quantity, description, price, photo_id, created_at
 	FROM items WHERE type = ? ORDER BY name`,
@@ -162,7 +162,7 @@ func GetByType(itemType string, db *sql.DB) ([]Item, error) {
 	}
 	defer rows.Close()
 
-	var items []Item
+	var items []*Item
 	for rows.Next() {
 		var item Item
 		if err := rows.Scan(
@@ -178,7 +178,7 @@ func GetByType(itemType string, db *sql.DB) ([]Item, error) {
 			log.Printf("Ошибка чтения товара: %v", err)
 			continue
 		}
-		items = append(items, item)
+		items = append(items, &item)
 	}
 
 	if err := rows.Err(); err != nil {
