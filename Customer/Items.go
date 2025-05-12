@@ -35,16 +35,26 @@ func Catalog(bh *th.BotHandler, db *sql.DB) {
 	bh.Handle(func(ctx *th.Context, update telego.Update) error {
 		bot := ctx.Bot()
 		callback := update.CallbackQuery
+		CDslc := strings.Split(callback.Data, " ")
 		chatID := telego.ChatID{ID: callback.Message.GetChat().ID}
 		messageID := callback.Message.GetMessageID()
-		items, err := Items.GetAll(db)
+		var items []*Items.Item
+		var itemType string
+		var err error
+		if len(CDslc) == 2 {
+			itemType = CDslc[1]
+			items, err = Items.GetByType(itemType, db)
+		} else {
+			items, err := Items.GetAll(db)
+		}
 		if err != nil {
 			errMsg(bot, chatID)
 			return err
 		}
 		ShowPage(0, items, bot, ctx, chatID, messageID)
 		return nil
-	}, th.CallbackDataEqual("catalog"))
+	}, th.CallbackDataContains("catalog"))
+
 	bh.Handle(func(ctx *th.Context, update telego.Update) error {
 		bot := ctx.Bot()
 		callback := update.CallbackQuery
@@ -58,10 +68,20 @@ func Catalog(bh *th.BotHandler, db *sql.DB) {
 		ShowPage(int(itemPage), items, bot, ctx, chatID, messageID)
 		return nil
 	}, th.CallbackDataContains("catPage"))
+
+	bh.Handle(func(ctx *th.Context, update telego.Update) error {
+		return nil
+	}, th.CallbackDataContains("itemSortBy"))
 }
 
 func ShowPage(itemPage int, items []*Items.Item, bot *telego.Bot, ctx *th.Context, id telego.ChatID, messageID int) {
+	backBtn := telego.InlineKeyboardButton{
+		Text:         "🔙 Назад",
+		CallbackData: "customer_menu",
+	}
+
 	if len(items) == 0 {
+		bot.EditMessageText(ctx, &telego.EditMessageTextParams{ReplyMarkup: tu.InlineKeyboard([]telego.InlineKeyboardButton{backBtn}), MessageID: messageID, ChatID: id, Text: "Товаров пока нет"})
 		return
 	}
 
@@ -107,6 +127,10 @@ func ShowPage(itemPage int, items []*Items.Item, bot *telego.Bot, ctx *th.Contex
 			CallbackData: fmt.Sprintf("catPage %v", itemPage-1),
 		})
 	}
+	navButtons = append(navButtons, telego.InlineKeyboardButton{
+		Text:         "Фильтр",
+		CallbackData: fmt.Sprintf("itemSort", itemPage),
+	})
 	if itemPage < maxPage {
 		navButtons = append(navButtons, telego.InlineKeyboardButton{
 			Text:         "Вперед >>",
@@ -118,12 +142,7 @@ func ShowPage(itemPage int, items []*Items.Item, bot *telego.Bot, ctx *th.Contex
 		keyboardRows = append(keyboardRows, navButtons)
 	}
 
-	keyboardRows = append(keyboardRows, []telego.InlineKeyboardButton{
-		{
-			Text:         "🔙 Назад",
-			CallbackData: "customer_menu",
-		},
-	})
+	keyboardRows = append(keyboardRows, []telego.InlineKeyboardButton{backBtn})
 
 	kb := telego.InlineKeyboardMarkup{
 		InlineKeyboard: keyboardRows,
