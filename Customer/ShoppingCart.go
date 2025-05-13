@@ -104,6 +104,31 @@ func ClearCart(bh *th.BotHandler, db *sql.DB) {
 	}, th.CallbackDataEqual("clearCart"))
 }
 
+func CartItem(bh *th.BotHandler, db *sql.DB) {
+	bh.Handle(func(ctx *th.Context, update telego.Update) error {
+		bot := ctx.Bot()
+		callback := update.CallbackQuery
+		itemID, _ := strconv.ParseInt(strings.Split(callback.Data, " ")[1], 10, 64)
+		chatID := telego.ChatID{ID: callback.Message.GetChat().ID}
+		user, _ := Users.GetByID(callback.From.ID, db)
+		item, _ := Items.GetByID(itemID, db)
+		quantity := 0
+		for existingItem, quan := range user.ShoppingCart {
+			if existingItem.ID == item.ID {
+				quantity = quan
+			}
+		}
+		btns := []telego.InlineKeyboardButton{
+			{Text: "Указать количество", CallbackData: fmt.Sprintf("changeQuantity %v", item.ID)},
+			{Text: "Удалить товар", CallbackData: fmt.Sprintf("deleteItemInCart %v", item.ID)},
+			{Text: "Закрыть", CallbackData: "deleteThis"},
+		}
+		kb := tu.InlineKeyboard(btns)
+		bot.SendMessage(ctx, &telego.SendMessageParams{ReplyMarkup: kb, ChatID: chatID, Text: fmt.Sprintf("Инфо о товаре:\n%v\nТип:%v\nОписание:\n%v\nСтоимость: %v ₽\nВ корзине:%v шт.", item.Name, item.Type, item.Description, item.Price, quantity)})
+		return nil
+	}, th.CallbackDataContains("cartItem"))
+}
+
 func ShowCartPage(itemPage int, items map[*Items.Item]int, bot *telego.Bot, ctx *th.Context, id telego.ChatID, messageID int) {
 	backBtn := telego.InlineKeyboardButton{
 		Text:         "🔙 Назад",
@@ -164,31 +189,38 @@ func ShowCartPage(itemPage int, items map[*Items.Item]int, bot *telego.Bot, ctx 
 		row := []telego.InlineKeyboardButton{
 			{
 				Text:         fmt.Sprintf("%s - %d шт. | %d ₽", item.Name, quantity, int(item.Price)),
-				CallbackData: fmt.Sprintf("item %v", item.ID),
+				CallbackData: fmt.Sprintf("cartItem %v", item.ID),
 			},
 		}
 		keyboardRows = append(keyboardRows, row)
 	}
 
-	// Добавляем кнопки навигации
 	var navButtons []telego.InlineKeyboardButton
+	var pgDownBtn string
 	if itemPage > 0 {
-		navButtons = append(navButtons, telego.InlineKeyboardButton{
-			Text:         "<< Назад",
-			CallbackData: fmt.Sprintf("cartPage %v", itemPage-1),
-		})
+		pgDownBtn = fmt.Sprintf("cartPage %v", itemPage-1)
+	} else {
+		pgDownBtn = "pageItemErr"
 	}
+	navButtons = append(navButtons, telego.InlineKeyboardButton{
+		Text:         "<< Назад",
+		CallbackData: pgDownBtn,
+	})
+	var pgUpBtn string
 	if itemPage < maxPage {
-		navButtons = append(navButtons, telego.InlineKeyboardButton{
-			Text:         "Вперед >>",
-			CallbackData: fmt.Sprintf("cartPage %v", itemPage+1),
-		})
+		pgUpBtn = fmt.Sprintf("cartPage %v", itemPage+1)
+	} else {
+		pgUpBtn = "pageItemErr"
 	}
+	navButtons = append(navButtons, telego.InlineKeyboardButton{
+		Text:         "Вперед >>",
+		CallbackData: pgUpBtn,
+	})
+
 	if len(navButtons) > 0 {
 		keyboardRows = append(keyboardRows, navButtons)
 	}
 
-	// Добавляем кнопки действий
 	keyboardRows = append(keyboardRows, []telego.InlineKeyboardButton{
 		{Text: "Оформить заказ", CallbackData: "makeOrder"},
 	})
@@ -197,7 +229,6 @@ func ShowCartPage(itemPage int, items map[*Items.Item]int, bot *telego.Bot, ctx 
 	})
 	keyboardRows = append(keyboardRows, []telego.InlineKeyboardButton{backBtn})
 
-	// Отправляем сообщение
 	_, _ = bot.EditMessageText(ctx, &telego.EditMessageTextParams{
 		ChatID:      id,
 		MessageID:   messageID,

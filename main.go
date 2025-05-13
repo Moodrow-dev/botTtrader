@@ -55,6 +55,8 @@ func main() {
 	Customer.ClearCart(bh, db)
 	Customer.AddItemToCart(bh, db)
 	Customer.MakeOrder(bh, db)
+	Customer.CartItem(bh, db)
+	Customer.SetupHandlers(bh, db)
 
 	go func() {
 		err1 := bh.Start()
