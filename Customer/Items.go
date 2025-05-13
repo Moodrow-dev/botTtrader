@@ -147,7 +147,7 @@ func ShowPage(itemPage int, itemType string, items []*Items.Item, bot *telego.Bo
 		callbackData := fmt.Sprintf("item %v", item.ID)
 		if item.Quantity == 0 {
 			btnText = "Нет в наличии"
-			callbackData = "notAvailibleItem"
+			callbackData = "notAvailableItem"
 		}
 
 		row := []telego.InlineKeyboardButton{

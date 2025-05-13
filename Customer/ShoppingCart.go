@@ -9,9 +9,15 @@ import (
 	"github.com/mymmrac/telego"
 	th "github.com/mymmrac/telego/telegohandler"
 	tu "github.com/mymmrac/telego/telegoutil"
+	"sort"
 	"strconv"
 	"strings"
 )
+
+type Pair struct {
+	Key   *Items.Item
+	Value int
+}
 
 func MyCart(bh *th.BotHandler, db *sql.DB) {
 	bh.Handle(func(ctx *th.Context, update telego.Update) error {
@@ -56,10 +62,12 @@ func AddItemToCart(bh *th.BotHandler, db *sql.DB) {
 		messageID := callback.Message.GetMessageID()
 		itemID, _ := strconv.ParseInt(strings.Split(callback.Data, " ")[1], 10, 64)
 		if err != nil {
-			item, _ := Items.GetByID(itemID, db)
-			user.AddToCart(item, 1)
-			bot.EditMessageText(ctx, &telego.EditMessageTextParams{MessageID: messageID, ChatID: chatID, Text: fmt.Sprintf("Товар: %v добавлен в корзину", item.Name)})
+			errMsg(bot, chatID)
 		}
+		item, _ := Items.GetByID(itemID, db)
+		user.AddToCart(item, 1)
+		kb := tu.InlineKeyboard([]telego.InlineKeyboardButton{{Text: "Закрыть", CallbackData: "deleteThis"}})
+		bot.EditMessageText(ctx, &telego.EditMessageTextParams{ReplyMarkup: kb, MessageID: messageID, ChatID: chatID, Text: fmt.Sprintf("Товар: %v добавлен в корзину", item.Name)})
 		Users.Save(user, db)
 		return nil
 	}, th.CallbackDataContains("addToCart"))
@@ -89,6 +97,7 @@ func ClearCart(bh *th.BotHandler, db *sql.DB) {
 		messageID := callback.Message.GetMessageID()
 		user, _ := Users.GetByID(callback.From.ID, db)
 		user.ShoppingCart = make(map[*Items.Item]int)
+		Users.Save(user, db)
 		kb := tu.InlineKeyboard([]telego.InlineKeyboardButton{{Text: "🔙 Назад", CallbackData: "mycart"}})
 		bot.EditMessageText(ctx, &telego.EditMessageTextParams{ReplyMarkup: kb, MessageID: messageID, ChatID: chatID, Text: "Корзина успешно очищена"})
 		return nil
@@ -102,40 +111,66 @@ func ShowCartPage(itemPage int, items map[*Items.Item]int, bot *telego.Bot, ctx 
 	}
 
 	if len(items) == 0 {
-		bot.EditMessageText(ctx, &telego.EditMessageTextParams{ReplyMarkup: tu.InlineKeyboard([]telego.InlineKeyboardButton{backBtn}), MessageID: messageID, ChatID: id, Text: "Ваша корзина пуста...\nНо это можно исправить😁"})
+		bot.EditMessageText(ctx, &telego.EditMessageTextParams{
+			ReplyMarkup: tu.InlineKeyboard([]telego.InlineKeyboardButton{backBtn}),
+			MessageID:   messageID,
+			ChatID:      id,
+			Text:        "Ваша корзина пуста...\nНо это можно исправить😁",
+		})
 		return
 	}
 
 	const itemsPerPage = 5
-	maxPage := (len(items) - 1) / itemsPerPage
 
+	// Конвертируем мапу в срез пар и сортируем по ID
+	type Pair struct {
+		Key   *Items.Item
+		Value int
+	}
+
+	allPairs := make([]Pair, 0, len(items))
+	for item, quantity := range items {
+		allPairs = append(allPairs, Pair{item, quantity})
+	}
+
+	// Сортируем по возрастанию ID
+	sort.Slice(allPairs, func(i, j int) bool {
+		return allPairs[i].Key.ID < allPairs[j].Key.ID
+	})
+
+	// Рассчитываем количество страниц
+	maxPage := (len(allPairs) - 1) / itemsPerPage
+
+	// Корректируем номер страницы
 	if itemPage < 0 {
 		itemPage = 0
 	} else if itemPage > maxPage {
 		itemPage = maxPage
 	}
 
+	// Получаем элементы для текущей страницы
 	start := itemPage * itemsPerPage
 	end := start + itemsPerPage
-	if end > len(items) {
-		end = len(items)
+	if end > len(allPairs) {
+		end = len(allPairs)
 	}
+	pagePairs := allPairs[start:end]
 
+	// Создаем кнопки для товаров
 	var keyboardRows [][]telego.InlineKeyboardButton
-
-	for item, quan := range items {
-		btnText := item.Name
-		callbackData := fmt.Sprintf("item %v", item.ID)
-
+	for _, pair := range pagePairs {
+		item := pair.Key
+		quantity := pair.Value
 		row := []telego.InlineKeyboardButton{
 			{
-				Text:         fmt.Sprintf("%v - %v шт. | %v ₽", btnText, quan, item.Price),
-				CallbackData: callbackData,
+				Text:         fmt.Sprintf("%s - %d шт. | %d ₽", item.Name, quantity, int(item.Price)),
+				CallbackData: fmt.Sprintf("item %v", item.ID),
 			},
 		}
 		keyboardRows = append(keyboardRows, row)
 	}
 
+	// Добавляем кнопки навигации
 	var navButtons []telego.InlineKeyboardButton
 	if itemPage > 0 {
 		navButtons = append(navButtons, telego.InlineKeyboardButton{
@@ -149,34 +184,24 @@ func ShowCartPage(itemPage int, items map[*Items.Item]int, bot *telego.Bot, ctx 
 			CallbackData: fmt.Sprintf("cartPage %v", itemPage+1),
 		})
 	}
-
 	if len(navButtons) > 0 {
 		keyboardRows = append(keyboardRows, navButtons)
 	}
 
+	// Добавляем кнопки действий
 	keyboardRows = append(keyboardRows, []telego.InlineKeyboardButton{
-		{
-			Text:         "Оформить заказ",
-			CallbackData: "makeOrder",
-		},
+		{Text: "Оформить заказ", CallbackData: "makeOrder"},
 	})
 	keyboardRows = append(keyboardRows, []telego.InlineKeyboardButton{
-		{
-			Text:         "Очистить корзину",
-			CallbackData: "clearCart",
-		},
+		{Text: "Очистить корзину", CallbackData: "clearCart"},
 	})
-
 	keyboardRows = append(keyboardRows, []telego.InlineKeyboardButton{backBtn})
 
-	kb := telego.InlineKeyboardMarkup{
-		InlineKeyboard: keyboardRows,
-	}
-
+	// Отправляем сообщение
 	_, _ = bot.EditMessageText(ctx, &telego.EditMessageTextParams{
 		ChatID:      id,
 		MessageID:   messageID,
-		Text:        fmt.Sprintf("В вашей корзине – %v предметов\nСтраница %v/%v\nВыберите товар:", len(items), itemPage+1, maxPage+1),
-		ReplyMarkup: &kb,
+		Text:        fmt.Sprintf("В вашей корзине – %d предметов\nСтраница %d/%d\nВыберите товар:", len(items), itemPage+1, maxPage+1),
+		ReplyMarkup: &telego.InlineKeyboardMarkup{InlineKeyboard: keyboardRows},
 	})
 }
