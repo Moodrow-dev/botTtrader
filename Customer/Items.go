@@ -2,6 +2,7 @@ package Customer
 
 import (
 	"botTtrader/Items"
+	"botTtrader/Utils"
 	"database/sql"
 	"fmt"
 	"github.com/mymmrac/telego"
@@ -24,9 +25,15 @@ func ItemInfo(bh *th.BotHandler, db *sql.DB) {
 			errMsg(bot, chatID)
 			return err
 		}
+		var quantity string
+		if item.Quantity == -1 {
+			quantity = "Под заказ"
+		} else {
+			quantity = fmt.Sprintf("%v шт.", strconv.Itoa(item.Quantity))
+		}
 		_, err = bot.SendPhoto(ctx, &telego.SendPhotoParams{ReplyMarkup: kb, Photo: telego.InputFile{FileID: item.PhotoId}, ChatID: chatID, Caption: fmt.Sprintf("Инфо о товаре:\n%v\nТип:%v\nОписание:\n%v\nСтоимость:%v ₽", item.Name, item.Type, item.Description, item.Price)})
 		if err != nil {
-			bot.SendMessage(ctx, &telego.SendMessageParams{ReplyMarkup: kb, ChatID: chatID, Text: fmt.Sprintf("Инфо о товаре:\n%v\nТип:%v\nОписание:\n%v\nСтоимость:%v ₽", item.Name, item.Type, item.Description, item.Price)})
+			bot.SendMessage(ctx, &telego.SendMessageParams{ParseMode: telego.ModeMarkdownV2, ReplyMarkup: kb, ChatID: chatID, Text: fmt.Sprintf("*Инфо о товаре:*\n%v\n*Тип:* %v\n*Описание:*\n%v\n*Стоимость:* %v ₽\n*Осталось:* %v", Utils.EscapeMarkdown(item.Name), Utils.EscapeMarkdown(item.Type), Utils.EscapeMarkdown(item.Description), Utils.EscapeMarkdown(fmt.Sprintf("%.2f", item.Price)), Utils.EscapeMarkdown(quantity))})
 		}
 		return nil
 	}, th.CallbackDataContains("item"))
@@ -143,7 +150,7 @@ func ShowPage(itemPage int, itemType string, items []*Items.Item, bot *telego.Bo
 	var keyboardRows [][]telego.InlineKeyboardButton
 
 	for _, item := range pageItems {
-		btnText := item.Name
+		btnText := fmt.Sprintf("%v | %v ₽", item.Name, item.Price)
 		callbackData := fmt.Sprintf("item %v", item.ID)
 		if item.Quantity == 0 {
 			btnText = "Нет в наличии"
