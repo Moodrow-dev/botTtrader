@@ -147,7 +147,7 @@ func ShowPage(itemPage int, itemType string, items []*Items.Item, bot *telego.Bo
 		callbackData := fmt.Sprintf("item %v", item.ID)
 		if item.Quantity == 0 {
 			btnText = "Нет в наличии"
-			callbackData = ""
+			callbackData = "notAvailibleItem"
 		}
 
 		row := []telego.InlineKeyboardButton{
@@ -160,22 +160,30 @@ func ShowPage(itemPage int, itemType string, items []*Items.Item, bot *telego.Bo
 	}
 
 	var navButtons []telego.InlineKeyboardButton
+	var pgDownBtn string
 	if itemPage > 0 {
-		navButtons = append(navButtons, telego.InlineKeyboardButton{
-			Text:         "<< Назад",
-			CallbackData: fmt.Sprintf("catPage %v %v", itemType, itemPage-1),
-		})
+		pgDownBtn = fmt.Sprintf("catPage %v %v", itemType, itemPage-1)
+	} else {
+		pgDownBtn = "pageItemErr"
 	}
+	navButtons = append(navButtons, telego.InlineKeyboardButton{
+		Text:         "<< Назад",
+		CallbackData: pgDownBtn,
+	})
 	navButtons = append(navButtons, telego.InlineKeyboardButton{
 		Text:         "Фильтр",
 		CallbackData: "itemSort",
 	})
+	var pgUpBtn string
 	if itemPage < maxPage {
-		navButtons = append(navButtons, telego.InlineKeyboardButton{
-			Text:         "Вперед >>",
-			CallbackData: fmt.Sprintf("catPage %v %v", itemType, itemPage+1),
-		})
+		pgUpBtn = fmt.Sprintf("catPage %v %v", itemType, itemPage+1)
+	} else {
+		pgUpBtn = "pageItemErr"
 	}
+	navButtons = append(navButtons, telego.InlineKeyboardButton{
+		Text:         "Вперед >>",
+		CallbackData: pgUpBtn,
+	})
 
 	if len(navButtons) > 0 {
 		keyboardRows = append(keyboardRows, navButtons)
