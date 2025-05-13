@@ -188,7 +188,7 @@ func ShowCartPage(itemPage int, items map[*Items.Item]int, bot *telego.Bot, ctx 
 		quantity := pair.Value
 		row := []telego.InlineKeyboardButton{
 			{
-				Text:         fmt.Sprintf("%s - %d шт. | %d ₽", item.Name, quantity, int(item.Price)),
+				Text:         fmt.Sprintf("%s - %d шт. | %d ₽", item.Name, quantity, int(item.Price)*quantity),
 				CallbackData: fmt.Sprintf("cartItem %v", item.ID),
 			},
 		}
