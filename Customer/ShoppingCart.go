@@ -2,7 +2,6 @@ package Customer
 
 import (
 	"botTtrader/Items"
-	"botTtrader/Orders"
 	"botTtrader/Users"
 	"database/sql"
 	"fmt"
@@ -73,22 +72,6 @@ func AddItemToCart(bh *th.BotHandler, db *sql.DB) {
 	}, th.CallbackDataContains("addToCart"))
 }
 
-func MakeOrder(bh *th.BotHandler, db *sql.DB) {
-	bh.Handle(func(ctx *th.Context, update telego.Update) error {
-		bot := ctx.Bot()
-		callback := update.CallbackQuery
-		chatID := telego.ChatID{ID: callback.Message.GetChat().ID}
-		messageID := callback.Message.GetMessageID()
-		user, _ := Users.GetByID(callback.From.ID, db)
-		orders, _ := Orders.GetAllIDs(db)
-		orderID := len(orders)
-		order := Orders.NewOrder(orderID, user, user.ShoppingCart)
-		Orders.Save(order, db)
-		bot.EditMessageText(ctx, &telego.EditMessageTextParams{MessageID: messageID, ChatID: chatID, Text: fmt.Sprintf("Отлично! Заказ %v создан.\nДля подтверждения оплаты отправьте чек в поддержку\nИнформация о заказе в личном кабинете", orderID)})
-		return nil
-	}, th.CallbackDataEqual("makeOrder"))
-}
-
 func ClearCart(bh *th.BotHandler, db *sql.DB) {
 	bh.Handle(func(ctx *th.Context, update telego.Update) error {
 		bot := ctx.Bot()
@@ -132,7 +115,7 @@ func CartItem(bh *th.BotHandler, db *sql.DB) {
 func ShowCartPage(itemPage int, items map[*Items.Item]int, bot *telego.Bot, ctx *th.Context, id telego.ChatID, messageID int) {
 	backBtn := telego.InlineKeyboardButton{
 		Text:         "🔙 Назад",
-		CallbackData: "customer_menu",
+		CallbackData: "customerMenu",
 	}
 
 	if len(items) == 0 {

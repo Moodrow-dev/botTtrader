@@ -65,10 +65,10 @@ func Cabinet(bh *th.BotHandler, db *sql.DB) {
 				telego.InlineKeyboardButton{Text: "🏠 Сменить адрес", CallbackData: "changeAddress"},
 			),
 			tu.InlineKeyboardRow(
-				telego.InlineKeyboardButton{Text: "📦 Мои заказы", CallbackData: "my_orders"},
+				telego.InlineKeyboardButton{Text: "📦 Мои заказы", CallbackData: "myOrders"},
 			),
 			tu.InlineKeyboardRow(
-				telego.InlineKeyboardButton{Text: "🔙 Назад", CallbackData: "customer_menu"},
+				telego.InlineKeyboardButton{Text: "🔙 Назад", CallbackData: "customerMenu"},
 			),
 		)
 

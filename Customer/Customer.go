@@ -56,5 +56,5 @@ func Menu(bh *th.BotHandler, db *sql.DB) {
 			ReplyMarkup: kb,
 		})
 		return nil
-	}, th.CallbackDataEqual("customer_menu"))
+	}, th.CallbackDataEqual("customerMenu"))
 }

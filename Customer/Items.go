@@ -56,7 +56,7 @@ func Catalog(bh *th.BotHandler, db *sql.DB) {
 			errMsg(bot, chatID)
 			return err
 		}
-		ShowPage(0, itemType, items, bot, ctx, chatID, messageID)
+		ShowItemsPage(0, itemType, items, bot, ctx, chatID, messageID)
 		return nil
 	}, th.CallbackDataContains("catalog"))
 
@@ -82,7 +82,7 @@ func Catalog(bh *th.BotHandler, db *sql.DB) {
 		if err != nil {
 			errMsg(bot, chatID)
 		}
-		ShowPage(int(itemPage), itemType, items, bot, ctx, chatID, messageID)
+		ShowItemsPage(int(itemPage), itemType, items, bot, ctx, chatID, messageID)
 		return nil
 	}, th.CallbackDataContains("catPage"))
 
@@ -120,10 +120,10 @@ func Catalog(bh *th.BotHandler, db *sql.DB) {
 	}, th.CallbackDataContains("itemSort"))
 }
 
-func ShowPage(itemPage int, itemType string, items []*Items.Item, bot *telego.Bot, ctx *th.Context, id telego.ChatID, messageID int) {
+func ShowItemsPage(itemPage int, itemType string, items []*Items.Item, bot *telego.Bot, ctx *th.Context, id telego.ChatID, messageID int) {
 	backBtn := telego.InlineKeyboardButton{
 		Text:         "🔙 Назад",
-		CallbackData: "customer_menu",
+		CallbackData: "customerMenu",
 	}
 
 	if len(items) == 0 {

@@ -41,7 +41,7 @@ func InitDB(db *sql.DB) error {
 		id INTEGER PRIMARY KEY,
 		time TIMESTAMP NOT NULL,
 		customer_id INTEGER NOT NULL,
-		order_value REAL NOT NULL,
+		order_value FLOAT NOT NULL,
 		track TEXT,
 		is_paid BOOLEAN NOT NULL DEFAULT FALSE,
 		created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -282,4 +282,22 @@ func (o *Order) RemoveItem(item *Items.Item) {
 	if o.Items != nil {
 		delete(o.Items, item)
 	}
+}
+
+func GetOrdersOfCustomer(customerID int64, db *sql.DB) ([]*Order, error) {
+	userOrders := []*Order{}
+	allOrdersIDs, err := GetAllIDs(db)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get orders %v", err)
+	}
+	for _, id := range allOrdersIDs {
+		order, err := GetByID(id, db)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get order: %v", err)
+		}
+		if order.Customer.ID == customerID {
+			userOrders = append(userOrders, order)
+		}
+	}
+	return userOrders, nil
 }

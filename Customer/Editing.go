@@ -117,7 +117,7 @@ func SetupHandlers(bh *th.BotHandler, db *sql.DB) {
 		userStates[userID] = userState{state: stateEditingAddress}
 		mu.Unlock()
 		return nil
-	}, th.CallbackDataEqual("change_address"))
+	}, th.CallbackDataEqual("changeAddress"))
 
 	// Изменение количества товара
 	bh.Handle(func(ctx *th.Context, update telego.Update) error {
