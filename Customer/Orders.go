@@ -163,7 +163,7 @@ func DeleteOrder(bh *th.BotHandler, db *sql.DB) {
 		Orders.Delete(int(orderID), db)
 		bot.EditMessageText(ctx, &telego.EditMessageTextParams{ReplyMarkup: tu.InlineKeyboard([]telego.InlineKeyboardButton{{Text: "Закрыть", CallbackData: "deleteThis"}}), MessageID: messageID, ChatID: chatID, Text: fmt.Sprintf("Заказ №%v отменен", orderID)})
 		return nil
-	})
+	}, th.CallbackDataContains("deleteOrder"))
 }
 
 func BuyNow(bh *th.BotHandler, db *sql.DB) {
