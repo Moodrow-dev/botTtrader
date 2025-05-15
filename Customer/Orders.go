@@ -62,7 +62,7 @@ func MyOrders(bh *th.BotHandler, db *sql.DB) {
 		itemPage, err := strconv.ParseInt(CDslc[1], 10, 64)
 		orders, err := Orders.GetOrdersOfCustomer(user.ID, db)
 		if err != nil {
-			errMsg(bot, chatID)
+			ErrMsg(bot, chatID)
 		}
 		ShowOrdersPage(int(itemPage), orders, bot, ctx, chatID, messageID)
 		return nil
@@ -157,7 +157,7 @@ func DeleteOrder(bh *th.BotHandler, db *sql.DB) {
 		orderID, err := strconv.ParseInt(strings.Split(callback.Data, " ")[1], 10, 64)
 		chatID := telego.ChatID{ID: callback.Message.GetChat().ID}
 		if err != nil {
-			errMsg(bot, chatID)
+			ErrMsg(bot, chatID)
 			return err
 		}
 		Orders.Delete(int(orderID), db)
@@ -176,7 +176,7 @@ func BuyNow(bh *th.BotHandler, db *sql.DB) {
 		messageID := callback.Message.GetMessageID()
 		itemID, _ = strconv.ParseInt(strings.Split(callback.Data, " ")[1], 10, 64)
 		if err != nil {
-			errMsg(bot, chatID)
+			ErrMsg(bot, chatID)
 		}
 		item, _ := Items.GetByID(itemID, db)
 		btns := []telego.InlineKeyboardButton{{Text: "Да", CallbackData: "confirmBuy"}, {Text: "Нет", CallbackData: "deleteThis"}}

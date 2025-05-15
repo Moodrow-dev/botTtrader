@@ -45,7 +45,7 @@ func MyCart(bh *th.BotHandler, db *sql.DB) {
 		user, err := Users.GetByID(callback.From.ID, db)
 		itemPage, err := strconv.ParseInt(strings.Split(callback.Data, " ")[1], 10, 64)
 		if err != nil {
-			errMsg(bot, chatID)
+			ErrMsg(bot, chatID)
 		}
 		ShowCartPage(int(itemPage), user.ShoppingCart, bot, ctx, chatID, messageID)
 		return nil
@@ -61,7 +61,7 @@ func AddItemToCart(bh *th.BotHandler, db *sql.DB) {
 		messageID := callback.Message.GetMessageID()
 		itemID, _ := strconv.ParseInt(strings.Split(callback.Data, " ")[1], 10, 64)
 		if err != nil {
-			errMsg(bot, chatID)
+			ErrMsg(bot, chatID)
 		}
 		item, _ := Items.GetByID(itemID, db)
 		user.AddToCart(item, 1)

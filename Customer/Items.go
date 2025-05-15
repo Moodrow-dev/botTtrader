@@ -22,7 +22,7 @@ func ItemInfo(bh *th.BotHandler, db *sql.DB) {
 		item, err := Items.GetByID(itemID, db)
 		kb := tu.InlineKeyboard([]telego.InlineKeyboardButton{{Text: "Добавить в корзину", CallbackData: fmt.Sprintf("addToCart %v", itemID)}, {Text: "Купить сейчас", CallbackData: fmt.Sprintf("buyNow %v", itemID)}, {Text: "Закрыть", CallbackData: "deleteThis"}})
 		if err != nil {
-			errMsg(bot, chatID)
+			ErrMsg(bot, chatID)
 			return err
 		}
 		var quantity string
@@ -53,7 +53,7 @@ func Catalog(bh *th.BotHandler, db *sql.DB) {
 			items, err = Items.GetByType(itemType, db)
 		}
 		if err != nil {
-			errMsg(bot, chatID)
+			ErrMsg(bot, chatID)
 			return err
 		}
 		ShowItemsPage(0, itemType, items, bot, ctx, chatID, messageID)
@@ -74,13 +74,13 @@ func Catalog(bh *th.BotHandler, db *sql.DB) {
 		}
 		itemPage, err = strconv.ParseInt(CDslc[2], 10, 64)
 		if err != nil {
-			errMsg(bot, chatID)
+			ErrMsg(bot, chatID)
 		}
 		if itemType != "Все" {
 			items, err = Items.GetByType(itemType, db)
 		}
 		if err != nil {
-			errMsg(bot, chatID)
+			ErrMsg(bot, chatID)
 		}
 		ShowItemsPage(int(itemPage), itemType, items, bot, ctx, chatID, messageID)
 		return nil
@@ -93,7 +93,7 @@ func Catalog(bh *th.BotHandler, db *sql.DB) {
 		messageID := callback.Message.GetMessageID()
 		items, err := Items.GetAll(db)
 		if err != nil {
-			errMsg(bot, chatID)
+			ErrMsg(bot, chatID)
 		}
 		types := make(map[string]bool)
 		typesSlice := []string{}

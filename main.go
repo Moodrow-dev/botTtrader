@@ -47,21 +47,8 @@ func main() {
 
 	Utils.DeleteThis(bh)
 
-	Customer.Catalog(bh, db)
-	Customer.Menu(bh, db)
-	Customer.ItemInfo(bh, db)
-	Customer.MyCart(bh, db)
-	Customer.Cabinet(bh, db)
-	Customer.ClearCart(bh, db)
-	Customer.MakeOrder(bh, db)
-	Customer.CartItem(bh, db)
 	SetupHandlers(bh, db)
-	Customer.MyOrders(bh, db)
-	Customer.BuyNow(bh, db)
-	Customer.AddItemToCart(bh, db)
-	Customer.DeleteItemInCart(bh, db)
-	Customer.OrderInfo(bh, db)
-	Customer.DeleteOrder(bh, db)
+	Customer.StartForCustomer(bh, db)
 
 	go func() {
 		err1 := bh.Start()

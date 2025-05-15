@@ -321,28 +321,21 @@ func GetAll(db *sql.DB) ([]User, error) {
 	return users, nil
 }
 
-// GetOwner retrieves the owner user.
-func GetOwner(db *sql.DB) (User, error) {
+// GetOwnerID retrieves the owner user.
+func GetOwnerID(db *sql.DB) (int64, error) {
 	var user User
 	err := db.QueryRow(
-		`SELECT id, name, phone, account, address, discount, is_owner, created_at 
-		FROM users WHERE is_owner = ?`, true,
+		`SELECT id, is_owner FROM users WHERE is_owner = ?`, true,
 	).Scan(
 		&user.ID,
-		&user.Name,
-		&user.Phone,
-		&user.Account,
-		&user.Address,
-		&user.Discount,
 		&user.IsOwner,
-		&user.CreatedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return User{}, fmt.Errorf("owner not found")
+			return 0, fmt.Errorf("owner not found")
 		}
-		return User{}, fmt.Errorf("failed to get owner: %v", err)
+		return 0, fmt.Errorf("failed to get owner: %v", err)
 	}
 
-	return user, nil
+	return user.ID, nil
 }

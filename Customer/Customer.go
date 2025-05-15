@@ -10,7 +10,24 @@ import (
 	tu "github.com/mymmrac/telego/telegoutil"
 )
 
-func errMsg(bot *telego.Bot, id telego.ChatID) {
+func StartForCustomer(bh *th.BotHandler, db *sql.DB) {
+	Catalog(bh, db)
+	Menu(bh, db)
+	ItemInfo(bh, db)
+	MyCart(bh, db)
+	Cabinet(bh, db)
+	ClearCart(bh, db)
+	MakeOrder(bh, db)
+	CartItem(bh, db)
+	MyOrders(bh, db)
+	BuyNow(bh, db)
+	AddItemToCart(bh, db)
+	DeleteItemInCart(bh, db)
+	OrderInfo(bh, db)
+	DeleteOrder(bh, db)
+}
+
+func ErrMsg(bot *telego.Bot, id telego.ChatID) {
 	errKb := tu.InlineKeyboard([]telego.InlineKeyboardButton{{Text: "Закрыть", CallbackData: "deleteThis"}})
 	bot.SendMessage(context.Background(), &telego.SendMessageParams{ReplyMarkup: errKb, ChatID: id, Text: "Произошла ошибка, обратитесь к владельцу"})
 }
