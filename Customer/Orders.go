@@ -4,6 +4,7 @@ import (
 	"botTtrader/Items"
 	"botTtrader/Orders"
 	"botTtrader/Users"
+	"botTtrader/Utils"
 	"database/sql"
 	"fmt"
 	"github.com/mymmrac/telego"
@@ -72,20 +73,80 @@ func OrderInfo(bh *th.BotHandler, db *sql.DB) {
 	bh.Handle(func(ctx *th.Context, update telego.Update) error {
 		bot := ctx.Bot()
 		callback := update.CallbackQuery
+		if callback == nil {
+			return nil
+		}
+
+		// Парсим ID заказа из callback data
 		orderID, err := strconv.ParseInt(strings.Split(callback.Data, " ")[1], 10, 64)
+
 		chatID := telego.ChatID{ID: callback.Message.GetChat().ID}
+
+		// Получаем заказ из базы данных
 		order, err := Orders.GetByID(int(orderID), db)
 		if err != nil {
-			errMsg(bot, chatID)
+			log.Println(err)
+			return err
 		}
+
+		// Формируем текст сообщения с использованием Markdown
+		var msgBuilder strings.Builder
+		msgBuilder.WriteString(fmt.Sprintf("*Заказ №%d*\n", order.ID))
+		msgBuilder.WriteString(fmt.Sprintf("📅 *Дата*: %s\n", Utils.EscapeMarkdown(order.CreatedAt.Format("02.01.2006 15:04"))))
+		msgBuilder.WriteString(fmt.Sprintf("💳 *Статус*: %s\n", getStatusText(order.IsPaid)))
+		if order.Track != "" {
+			msgBuilder.WriteString(fmt.Sprintf("📦 *Трек-номер*: %s\n", order.Track))
+		}
+		if order.Customer != nil {
+			msgBuilder.WriteString(fmt.Sprintf("👤 *Клиент*: %s\n", order.Customer.Name))
+		}
+		msgBuilder.WriteString("\n*Товары*:\n")
+
+		// Перечисляем товары из мапы
+		itemIndex := 1
+		for item, quantity := range order.Items {
+			msgBuilder.WriteString(
+				Utils.EscapeMarkdown(fmt.Sprintf(
+					"%d. %s\n   Кол-во: %d x %.2f ₽ = %.2f ₽\n",
+					itemIndex, item.Name, quantity, item.Price, float64(quantity)*item.Price,
+				)),
+			)
+			itemIndex++
+		}
+
+		// Добавляем итоговую сумму
+		msgBuilder.WriteString("\n*Итого*:" + Utils.EscapeMarkdown(fmt.Sprintf(" %.2f ₽\n", order.OrderValue)))
+
+		// Формируем кнопки
 		var btns []telego.InlineKeyboardButton
 		if !order.IsPaid {
-			btns = append(btns, telego.InlineKeyboardButton{Text: "Отменить заказ", CallbackData: fmt.Sprintf("deleteOrder %v", order.ID)})
+			btns = append(btns, telego.InlineKeyboardButton{
+				Text:         "Отменить заказ",
+				CallbackData: fmt.Sprintf("deleteOrder %d", order.ID),
+			})
 		}
-		btns = append(btns, telego.InlineKeyboardButton{Text: "Закрыть", CallbackData: "deleteThis"})
-		bot.SendMessage(ctx, &telego.SendMessageParams{ReplyMarkup: tu.InlineKeyboard(btns), ChatID: chatID, Text: fmt.Sprintf("Заказ №%v", order.ID)})
+		btns = append(btns, telego.InlineKeyboardButton{
+			Text:         "Закрыть",
+			CallbackData: "deleteThis",
+		})
+
+		// Отправляем сообщение
+		bot.SendMessage(ctx, &telego.SendMessageParams{ParseMode: telego.ModeMarkdownV2, ReplyMarkup: tu.InlineKeyboard(btns), ChatID: chatID, Text: msgBuilder.String()})
+
+		if err != nil {
+			return err
+		}
+
 		return nil
 	}, th.CallbackDataContains("order"))
+}
+
+// Вспомогательная функция для получения текста статуса
+func getStatusText(isPaid bool) string {
+	if isPaid {
+		return "Оплачен"
+	}
+	return "Ожидает оплаты"
 }
 
 func DeleteOrder(bh *th.BotHandler, db *sql.DB) {
