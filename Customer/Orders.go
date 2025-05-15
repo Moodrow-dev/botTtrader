@@ -21,9 +21,7 @@ func MakeOrder(bh *th.BotHandler, db *sql.DB) {
 		chatID := telego.ChatID{ID: callback.Message.GetChat().ID}
 		messageID := callback.Message.GetMessageID()
 		user, _ := Users.GetByID(callback.From.ID, db)
-		orders, _ := Orders.GetAllIDs(db)
-		orderID := len(orders)
-		order := Orders.NewOrder(orderID, user, user.ShoppingCart)
+		order := Orders.NewOrder(db, user, user.ShoppingCart)
 		err := Orders.Save(order, db)
 		if err != nil {
 			log.Println(err)
@@ -35,7 +33,7 @@ func MakeOrder(bh *th.BotHandler, db *sql.DB) {
 			log.Println(err)
 			return err
 		}
-		bot.EditMessageText(ctx, &telego.EditMessageTextParams{MessageID: messageID, ChatID: chatID, Text: fmt.Sprintf("Отлично! Заказ %v создан.\nДля подтверждения оплаты отправьте чек в поддержку\nИнформация о заказе в личном кабинете", orderID)})
+		bot.EditMessageText(ctx, &telego.EditMessageTextParams{ReplyMarkup: tu.InlineKeyboard([]telego.InlineKeyboardButton{{Text: "Закрыть", CallbackData: "deleteThis"}}), MessageID: messageID, ChatID: chatID, Text: fmt.Sprintf("Отлично! Заказ %v создан.\nДля подтверждения оплаты отправьте чек в поддержку\nИнформация о заказе в личном кабинете", order.ID)})
 		return nil
 	}, th.CallbackDataEqual("makeOrder"))
 }
@@ -48,73 +46,132 @@ func MyOrders(bh *th.BotHandler, db *sql.DB) {
 		messageID := callback.Message.GetMessageID()
 		user, _ := Users.GetByID(callback.From.ID, db)
 		userOrders, _ := Orders.GetOrdersOfCustomer(user.ID, db)
-		btns := []telego.InlineKeyboardButton{}
-		for _, order := range userOrders {
-			btns = append(btns, telego.InlineKeyboardButton{Text: fmt.Sprintf("Заказ №%v", order.ID), CallbackData: fmt.Sprintf("order %v", order.ID)})
-		}
-		btns = append(btns, telego.InlineKeyboardButton{Text: "🔙 Назад", CallbackData: "cabinet"})
-
-		bot.EditMessageText(ctx, &telego.EditMessageTextParams{ReplyMarkup: tu.InlineKeyboard(btns), MessageID: messageID, ChatID: chatID, Text: "Ваши активные заказы"})
+		ShowOrdersPage(0, userOrders, bot, ctx, chatID, messageID)
 		return nil
 	}, th.CallbackDataEqual("myOrders"))
+
+	bh.Handle(func(ctx *th.Context, update telego.Update) error {
+		bot := ctx.Bot()
+		callback := update.CallbackQuery
+		CDslc := strings.Split(callback.Data, " ")
+		chatID := telego.ChatID{ID: callback.Message.GetChat().ID}
+		user, _ := Users.GetByID(callback.From.ID, db)
+		messageID := callback.Message.GetMessageID()
+		var itemPage int64
+		itemPage, err := strconv.ParseInt(CDslc[1], 10, 64)
+		orders, err := Orders.GetOrdersOfCustomer(user.ID, db)
+		if err != nil {
+			errMsg(bot, chatID)
+		}
+		ShowOrdersPage(int(itemPage), orders, bot, ctx, chatID, messageID)
+		return nil
+	}, th.CallbackDataContains("ordPage"))
+}
+
+func OrderInfo(bh *th.BotHandler, db *sql.DB) {
+	bh.Handle(func(ctx *th.Context, update telego.Update) error {
+		bot := ctx.Bot()
+		callback := update.CallbackQuery
+		orderID, err := strconv.ParseInt(strings.Split(callback.Data, " ")[1], 10, 64)
+		chatID := telego.ChatID{ID: callback.Message.GetChat().ID}
+		order, err := Orders.GetByID(int(orderID), db)
+		if err != nil {
+			errMsg(bot, chatID)
+		}
+		var btns []telego.InlineKeyboardButton
+		if !order.IsPaid {
+			btns = append(btns, telego.InlineKeyboardButton{Text: "Отменить заказ", CallbackData: fmt.Sprintf("deleteOrder %v", order.ID)})
+		}
+		btns = append(btns, telego.InlineKeyboardButton{Text: "Закрыть", CallbackData: "deleteThis"})
+		bot.SendMessage(ctx, &telego.SendMessageParams{ReplyMarkup: tu.InlineKeyboard(btns), ChatID: chatID, Text: fmt.Sprintf("Заказ №%v", order.ID)})
+		return nil
+	}, th.CallbackDataContains("order"))
+}
+
+func DeleteOrder(bh *th.BotHandler, db *sql.DB) {
+	bh.Handle(func(ctx *th.Context, update telego.Update) error {
+		bot := ctx.Bot()
+		callback := update.CallbackQuery
+		messageID := callback.Message.GetMessageID()
+		orderID, err := strconv.ParseInt(strings.Split(callback.Data, " ")[1], 10, 64)
+		chatID := telego.ChatID{ID: callback.Message.GetChat().ID}
+		if err != nil {
+			errMsg(bot, chatID)
+			return err
+		}
+		Orders.Delete(int(orderID), db)
+		bot.EditMessageText(ctx, &telego.EditMessageTextParams{ReplyMarkup: tu.InlineKeyboard([]telego.InlineKeyboardButton{{Text: "Закрыть", CallbackData: "deleteThis"}}), MessageID: messageID, ChatID: chatID, Text: fmt.Sprintf("Заказ №%v отменен", orderID)})
+		return nil
+	})
 }
 
 func BuyNow(bh *th.BotHandler, db *sql.DB) {
+	var itemID int64
 	bh.Handle(func(ctx *th.Context, update telego.Update) error {
 		bot := ctx.Bot()
 		callback := update.CallbackQuery
 		chatID := telego.ChatID{ID: callback.Message.GetChat().ID}
 		user, err := Users.GetByID(callback.From.ID, db)
 		messageID := callback.Message.GetMessageID()
-		itemID, _ := strconv.ParseInt(strings.Split(callback.Data, " ")[1], 10, 64)
+		itemID, _ = strconv.ParseInt(strings.Split(callback.Data, " ")[1], 10, 64)
 		if err != nil {
 			errMsg(bot, chatID)
 		}
 		item, _ := Items.GetByID(itemID, db)
-		user.AddToCart(item, 1)
-		kb := tu.InlineKeyboard([]telego.InlineKeyboardButton{{Text: "Закрыть", CallbackData: "deleteThis"}})
-		bot.EditMessageText(ctx, &telego.EditMessageTextParams{ReplyMarkup: kb, MessageID: messageID, ChatID: chatID, Text: fmt.Sprintf("Оформить заказ?", item.Name)})
+		btns := []telego.InlineKeyboardButton{{Text: "Да", CallbackData: "confirmBuy"}, {Text: "Нет", CallbackData: "deleteThis"}}
+		kb := tu.InlineKeyboardGrid(tu.InlineKeyboardCols(1, btns...))
+		bot.EditMessageText(ctx, &telego.EditMessageTextParams{ReplyMarkup: kb, MessageID: messageID, ChatID: chatID, Text: fmt.Sprintf("%v\nОформить заказ?", item.Name)})
 		Users.Save(user, db)
 		return nil
 	}, th.CallbackDataContains("buyNow"))
+
+	bh.Handle(func(ctx *th.Context, update telego.Update) error {
+		bot := ctx.Bot()
+		callback := update.CallbackQuery
+		chatID := telego.ChatID{ID: callback.Message.GetChat().ID}
+		messageID := callback.Message.GetMessageID()
+		user, _ := Users.GetByID(callback.From.ID, db)
+		item, _ := Items.GetByID(itemID, db)
+		items := map[*Items.Item]int{item: 1}
+		order := Orders.NewOrder(db, user, items)
+		Orders.Save(order, db)
+		bot.EditMessageText(ctx, &telego.EditMessageTextParams{ReplyMarkup: tu.InlineKeyboard([]telego.InlineKeyboardButton{{Text: "Закрыть", CallbackData: "deleteThis"}}), MessageID: messageID, ChatID: chatID, Text: fmt.Sprintf("Отлично! Заказ %v создан.\nДля подтверждения оплаты отправьте чек в поддержку\nИнформация о заказе в личном кабинете", order.ID)})
+		return nil
+	}, th.CallbackDataEqual("confirmBuy"))
 }
 
-func ShowOrdersPage(itemPage int, itemType string, items []*Items.Item, bot *telego.Bot, ctx *th.Context, id telego.ChatID, messageID int) {
+func ShowOrdersPage(orderPage int, orders []*Orders.Order, bot *telego.Bot, ctx *th.Context, id telego.ChatID, messageID int) {
 	backBtn := telego.InlineKeyboardButton{
 		Text:         "🔙 Назад",
-		CallbackData: "customerMenu",
+		CallbackData: "cabinet",
 	}
 
-	if len(items) == 0 {
-		bot.EditMessageText(ctx, &telego.EditMessageTextParams{ReplyMarkup: tu.InlineKeyboard([]telego.InlineKeyboardButton{backBtn}), MessageID: messageID, ChatID: id, Text: "Товаров пока нет"})
+	if len(orders) == 0 {
+		bot.EditMessageText(ctx, &telego.EditMessageTextParams{ReplyMarkup: tu.InlineKeyboard([]telego.InlineKeyboardButton{backBtn}), MessageID: messageID, ChatID: id, Text: "Заказов пока нет"})
 		return
 	}
 
-	const itemsPerPage = 5
-	maxPage := (len(items) - 1) / itemsPerPage
+	const ordersPerPage = 5
+	maxPage := (len(orders) - 1) / ordersPerPage
 
-	if itemPage < 0 {
-		itemPage = 0
-	} else if itemPage > maxPage {
-		itemPage = maxPage
+	if orderPage < 0 {
+		orderPage = 0
+	} else if orderPage > maxPage {
+		orderPage = maxPage
 	}
 
-	start := itemPage * itemsPerPage
-	end := start + itemsPerPage
-	if end > len(items) {
-		end = len(items)
+	start := orderPage * ordersPerPage
+	end := start + ordersPerPage
+	if end > len(orders) {
+		end = len(orders)
 	}
-	pageItems := items[start:end]
+	pageOrders := orders[start:end]
 
 	var keyboardRows [][]telego.InlineKeyboardButton
 
-	for _, item := range pageItems {
-		btnText := fmt.Sprintf("%v | %v ₽", item.Name, item.Price)
-		callbackData := fmt.Sprintf("item %v", item.ID)
-		if item.Quantity == 0 {
-			btnText = "Нет в наличии"
-			callbackData = "notAvailableItem"
-		}
+	for _, order := range pageOrders {
+		btnText := fmt.Sprintf("Заказ №%v | %v ₽", order.ID, order.OrderValue)
+		callbackData := fmt.Sprintf("order %v", order.ID)
 
 		row := []telego.InlineKeyboardButton{
 			{
@@ -127,24 +184,20 @@ func ShowOrdersPage(itemPage int, itemType string, items []*Items.Item, bot *tel
 
 	var navButtons []telego.InlineKeyboardButton
 	var pgDownBtn string
-	if itemPage > 0 {
-		pgDownBtn = fmt.Sprintf("catPage %v %v", itemType, itemPage-1)
+	if orderPage > 0 {
+		pgDownBtn = fmt.Sprintf("ordPage %v", orderPage-1)
 	} else {
-		pgDownBtn = "pageItemErr"
+		pgDownBtn = "pageOrderErr"
 	}
 	navButtons = append(navButtons, telego.InlineKeyboardButton{
 		Text:         "<< Назад",
 		CallbackData: pgDownBtn,
 	})
-	navButtons = append(navButtons, telego.InlineKeyboardButton{
-		Text:         "Фильтр",
-		CallbackData: "itemSort",
-	})
 	var pgUpBtn string
-	if itemPage < maxPage {
-		pgUpBtn = fmt.Sprintf("catPage %v %v", itemType, itemPage+1)
+	if orderPage < maxPage {
+		pgUpBtn = fmt.Sprintf("ordPage %v", orderPage+1)
 	} else {
-		pgUpBtn = "pageItemErr"
+		pgUpBtn = "pageOrderErr"
 	}
 	navButtons = append(navButtons, telego.InlineKeyboardButton{
 		Text:         "Вперед >>",
@@ -164,7 +217,7 @@ func ShowOrdersPage(itemPage int, itemType string, items []*Items.Item, bot *tel
 	_, _ = bot.EditMessageText(ctx, &telego.EditMessageTextParams{
 		ChatID:      id,
 		MessageID:   messageID,
-		Text:        fmt.Sprintf("Тип: %v\nСтраница %v/%v\nВыберите товар:", itemType, itemPage+1, maxPage+1),
+		Text:        fmt.Sprintf("Ваши активные заказы\nСтраница %v/%v\nВыберите заказ:", orderPage+1, maxPage+1),
 		ReplyMarkup: &kb,
 	})
 }

@@ -1,6 +1,7 @@
-package Customer
+package main
 
 import (
+	"botTtrader/Items"
 	"botTtrader/Users"
 	"database/sql"
 	"fmt"
@@ -131,6 +132,7 @@ func SetupHandlers(bh *th.BotHandler, db *sql.DB) {
 		userID := callback.From.ID
 
 		itemID, err := strconv.ParseInt(strings.Split(callback.Data, " ")[1], 10, 64)
+		item, err := Items.GetByID(itemID, db)
 		if err != nil {
 			log.Printf("Invalid item ID: %v", err)
 			return err
@@ -144,10 +146,16 @@ func SetupHandlers(bh *th.BotHandler, db *sql.DB) {
 		}
 		mu.Unlock()
 
+		var quan int
+		if item.Quantity != -1 {
+			quan = item.Quantity
+		} else {
+			quan = 1000
+		}
 		_, err = bot.EditMessageText(ctx, &telego.EditMessageTextParams{
 			ChatID:    chatID,
 			MessageID: messageID,
-			Text:      "Введите нужное количество товара (например: 123):",
+			Text:      fmt.Sprintf("Введите нужное количество товара (макс. %v):", quan),
 		})
 
 		if err != nil {
@@ -237,16 +245,25 @@ func SetupHandlers(bh *th.BotHandler, db *sql.DB) {
 			if err != nil || newQuantity <= 0 {
 				errorMessage = "⚠️ Пожалуйста, введите корректное количество (целое число больше 0)"
 			} else {
-				for item := range user.ShoppingCart {
+				for item, quantity := range user.ShoppingCart {
 					if item.ID == stateData.itemID {
-						user.ShoppingCart[item] = int(newQuantity)
+						newItem, err := Items.GetByID(item.ID, db)
+						if err != nil {
+							errorMessage = fmt.Sprintf("Ошибка при получении товара: %v", err)
+							break
+						}
+						if quantity != -1 && newItem.Quantity < int(newQuantity) {
+							errorMessage = fmt.Sprintf("⚠️ Такого количества товара нет в наличии. Осталось %v штук", newItem.Quantity)
+						} else {
+							user.ShoppingCart[item] = int(newQuantity) // Обновляем количество в мапе
+						}
 						break
 					}
 				}
 				successMessage = fmt.Sprintf("✅ Количество товара изменено на %d!", newQuantity)
 				replyMarkup = tu.InlineKeyboard(
 					tu.InlineKeyboardRow(
-						telego.InlineKeyboardButton{Text: "Вернуться в корзину", CallbackData: "mycart"},
+						telego.InlineKeyboardButton{Text: "Вернуться в корзину", CallbackData: "myCart"},
 					),
 				)
 			}

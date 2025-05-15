@@ -35,7 +35,7 @@ func MyCart(bh *th.BotHandler, db *sql.DB) {
 		}
 		ShowCartPage(0, user.ShoppingCart, bot, ctx, chatID, messageID)
 		return err
-	}, th.CallbackDataEqual("mycart"))
+	}, th.CallbackDataEqual("myCart"))
 
 	bh.Handle(func(ctx *th.Context, update telego.Update) error {
 		bot := ctx.Bot()
@@ -81,7 +81,7 @@ func ClearCart(bh *th.BotHandler, db *sql.DB) {
 		user, _ := Users.GetByID(callback.From.ID, db)
 		user.ShoppingCart = make(map[*Items.Item]int)
 		Users.Save(user, db)
-		kb := tu.InlineKeyboard([]telego.InlineKeyboardButton{{Text: "🔙 Назад", CallbackData: "mycart"}})
+		kb := tu.InlineKeyboard([]telego.InlineKeyboardButton{{Text: "🔙 Назад", CallbackData: "myCart"}})
 		bot.EditMessageText(ctx, &telego.EditMessageTextParams{ReplyMarkup: kb, MessageID: messageID, ChatID: chatID, Text: "Корзина успешно очищена"})
 		return nil
 	}, th.CallbackDataEqual("clearCart"))
@@ -110,6 +110,27 @@ func CartItem(bh *th.BotHandler, db *sql.DB) {
 		bot.SendMessage(ctx, &telego.SendMessageParams{ReplyMarkup: kb, ChatID: chatID, Text: fmt.Sprintf("Инфо о товаре:\n%v\nТип:%v\nОписание:\n%v\nСтоимость: %v ₽\nВ корзине:%v шт.", item.Name, item.Type, item.Description, item.Price, quantity)})
 		return nil
 	}, th.CallbackDataContains("cartItem"))
+}
+
+func DeleteItemInCart(bh *th.BotHandler, db *sql.DB) {
+	bh.Handle(func(ctx *th.Context, update telego.Update) error {
+		bot := ctx.Bot()
+		callback := update.CallbackQuery
+		itemID, _ := strconv.ParseInt(strings.Split(callback.Data, " ")[1], 10, 64)
+		chatID := telego.ChatID{ID: callback.Message.GetChat().ID}
+		messageID := callback.Message.GetMessageID()
+		user, _ := Users.GetByID(callback.From.ID, db)
+		needItem, _ := Items.GetByID(itemID, db)
+		cart := user.ShoppingCart
+		for item, _ := range cart {
+			if item.ID == needItem.ID {
+				delete(user.ShoppingCart, item)
+			}
+		}
+		Users.Save(user, db)
+		bot.EditMessageText(ctx, &telego.EditMessageTextParams{ReplyMarkup: tu.InlineKeyboard([]telego.InlineKeyboardButton{{Text: "Закрыть", CallbackData: "deleteThis"}}), MessageID: messageID, ChatID: chatID, Text: fmt.Sprintf("Товар %v удален из корзины", needItem.Name)})
+		return nil
+	}, th.CallbackDataContains("deleteItemInCart"))
 }
 
 func ShowCartPage(itemPage int, items map[*Items.Item]int, bot *telego.Bot, ctx *th.Context, id telego.ChatID, messageID int) {
@@ -215,7 +236,7 @@ func ShowCartPage(itemPage int, items map[*Items.Item]int, bot *telego.Bot, ctx 
 	_, _ = bot.EditMessageText(ctx, &telego.EditMessageTextParams{
 		ChatID:      id,
 		MessageID:   messageID,
-		Text:        fmt.Sprintf("В вашей корзине – %d предметов\nСтраница %d/%d\nВыберите товар:", len(items), itemPage+1, maxPage+1),
+		Text:        fmt.Sprintf("В вашей корзине – %d товаров\nСтраница %d/%d\nВыберите товар:", len(items), itemPage+1, maxPage+1),
 		ReplyMarkup: &telego.InlineKeyboardMarkup{InlineKeyboard: keyboardRows},
 	})
 }

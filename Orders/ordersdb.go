@@ -29,8 +29,8 @@ func Drop(db *sql.DB) {
 	}
 }
 
-func NewOrder(ID int, Customer *Users.User, Items map[*Items.Item]int) *Order {
-	order := &Order{ID: ID, Customer: Customer, Items: Items, OrderValue: 0, CreatedAt: time.Now(), Track: "", IsPaid: false}
+func NewOrder(db *sql.DB, Customer *Users.User, Items map[*Items.Item]int) *Order {
+	order := &Order{ID: GetNewOrderID(db), Customer: Customer, Items: Items, OrderValue: 0, CreatedAt: time.Now(), Track: "", IsPaid: false}
 	order.OrderValue = order.CalculateOrderValue()
 	return order
 }
@@ -300,4 +300,10 @@ func GetOrdersOfCustomer(customerID int64, db *sql.DB) ([]*Order, error) {
 		}
 	}
 	return userOrders, nil
+}
+
+func GetNewOrderID(db *sql.DB) int {
+	orders, _ := GetAllIDs(db)
+	order := orders[0]
+	return order + 1
 }
