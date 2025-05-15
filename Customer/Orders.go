@@ -93,7 +93,7 @@ func OrderInfo(bh *th.BotHandler, db *sql.DB) {
 		var msgBuilder strings.Builder
 		msgBuilder.WriteString(fmt.Sprintf("*Заказ №%d*\n", order.ID))
 		msgBuilder.WriteString(fmt.Sprintf("📅 *Дата*: %s\n", Utils.EscapeMarkdown(order.CreatedAt.Format("02.01.2006 15:04"))))
-		msgBuilder.WriteString(fmt.Sprintf("💳 *Статус*: %s\n", getStatusText(order.IsPaid)))
+		msgBuilder.WriteString(fmt.Sprintf("💳 *Статус*: %s\n", GetStatusText(order.IsPaid)))
 		if order.Track != "" {
 			msgBuilder.WriteString(fmt.Sprintf("📦 *Трек-номер*: %s\n", order.Track))
 		}
@@ -142,7 +142,7 @@ func OrderInfo(bh *th.BotHandler, db *sql.DB) {
 }
 
 // Вспомогательная функция для получения текста статуса
-func getStatusText(isPaid bool) string {
+func GetStatusText(isPaid bool) string {
 	if isPaid {
 		return "Оплачен"
 	}
